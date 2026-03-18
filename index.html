@@ -148,12 +148,12 @@ img{max-width:100%}
 .ni.on{background:linear-gradient(135deg,rgba(59,130,246,.16),rgba(59,130,246,.05));
   color:var(--blue);border-color:rgba(59,130,246,.24)}.ni.on .ni-dot{color:var(--blue)}
 .sbf{padding:.95rem 1.2rem;border-top:1px solid var(--bd)}
-.ubadge{display:flex;align-items:center;gap:.7rem;margin-bottom:.85rem}
+.ubadge{display:flex;align-items:center;gap:.7rem;margin-bottom:.5rem}
+.ubadge:hover{background:var(--gl2)}
 .uav{width:36px;height:36px;border-radius:50%;
   background:linear-gradient(135deg,var(--blue),var(--purple));
   display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;color:#fff;flex-shrink:0}
 .un{font-size:.875rem;font-weight:600}.ur{font-size:.72rem;color:var(--t2)}
-.sbacts{display:flex;gap:.5rem}
 .sbbd{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
 .sbbd.on{display:block}
 
@@ -497,8 +497,6 @@ img{max-width:100%}
 @media(max-width:860px){
   .tb-actions{display:flex}
   .tb-actions .iBtn{width:34px;height:34px;font-size:.95rem;flex-shrink:0}
-  /* Hide duplicate sidebar theme+logout on mobile — they're in the topbar */
-  .sbacts{display:none}
 }
 
 /* ── CASH STATEMENT ── */
@@ -584,12 +582,10 @@ img{max-width:100%}
   #sbclose{display:flex}
   .mn{margin-left:0;padding-bottom:72px}
   .hbtn{display:flex}
-  #thtog{display:none}#tmtog{display:flex}
   .mobile-nav{display:flex}
   .tb .hbtn{display:flex}
   .tb-actions{display:flex}
   .tb-actions .iBtn{width:36px;height:36px;font-size:.95rem;flex-shrink:0}
-  .sbacts{display:none}
 
   /* Content */
   .ct{padding:.9rem .9rem 1.5rem}
@@ -868,16 +864,24 @@ img{max-width:100%}
       <a class="ni" data-s="calendar"><span class="ni-dot">◉</span> Calendar</a>
     </nav>
     <div class="sbf">
-      <div class="ubadge" id="ubadge-btn" title="Account Settings" style="cursor:pointer;border-radius:var(--r10);padding:.35rem;margin:-.35rem;transition:background var(--tr)" onmouseover="this.style.background='var(--gl2)'" onmouseout="this.style.background=''">
+      <!-- Clickable profile banner — opens Account Settings -->
+      <div class="ubadge" id="ubadge-btn" title="Account Settings"
+        style="cursor:pointer;border-radius:var(--r10);padding:.45rem .5rem;margin:0 -.5rem;
+               transition:background var(--tr)">
         <div class="uav" id="uav">A</div>
-        <div><div class="un" id="uname">User</div><div class="ur">Tap to manage account</div></div>
+        <div style="flex:1;min-width:0">
+          <div class="un" id="uname">User</div>
+          <div class="ur" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⚙ Manage account</div>
+        </div>
+        <!-- Sign out stays inside banner row -->
+        <button id="btn-out" class="iBtn" title="Sign out"
+          style="flex-shrink:0;opacity:.6;font-size:.85rem"
+          onclick="event.stopPropagation()">⏻</button>
       </div>
-      <div class="sbacts">
-        <button class="iBtn" id="thtog"  title="Theme">☽</button>
-        <button class="iBtn" id="tmtog"  title="Theme">☽</button>
-        <button class="iBtn" id="btn-acct" title="Account Settings">⚙</button>
-        <button class="iBtn" id="btn-out" title="Sign out">⏻</button>
-      </div>
+      <!-- Branding -->
+      <p style="font-size:.65rem;color:var(--t3);text-align:center;margin-top:.7rem;line-height:1.5">
+        Made by <strong style="color:var(--t2)">Rehan Fernando</strong>
+      </p>
     </div>
   </aside>
 
@@ -888,11 +892,11 @@ img{max-width:100%}
       <div class="tbr">
         <div class="live"><div class="ldot"></div>Live</div>
         <button class="iBtn" id="rf-btn" title="Refresh prices">↻</button>
-        <button class="btn bp" id="tb-qadd" style="font-size:.78rem;padding:.42rem .85rem;gap:.3rem" title="Quick add transaction">＋ Add</button>
-      </div>
-      <div class="tb-actions">
         <button class="iBtn" id="tb-theme" title="Toggle theme">☽</button>
-        <button class="iBtn" id="tb-logout" title="Sign out" style="font-size:.85rem">⏻</button>
+        <button class="btn bp" id="tb-qadd" style="font-size:.78rem;padding:.42rem .85rem;gap:.3rem" title="Quick add">＋ Add</button>
+      </div>
+      <!-- Mobile-only overflow actions (theme already in tbr above) -->
+      <div class="tb-actions">
       </div>
     </header>
 
@@ -1336,9 +1340,8 @@ function applyTheme(t){
   syncThemeIcons();
 }
 applyTheme(S.theme);
-[$('thtog'),$('tmtog')].forEach(b=>b&&b.addEventListener('click',()=>applyTheme(S.theme==='dark'?'light':'dark')));
 
-// Mobile topbar theme
+// Mobile topbar theme toggle
 $('tb-theme')?.addEventListener('click',()=>applyTheme(S.theme==='dark'?'light':'dark'));
 
 // Auth page theme toggle (on login screen, before user is signed in)
@@ -1364,7 +1367,7 @@ syncAuthThemeBtn(S.theme);
 // Sync all theme icons in app
 function syncThemeIcons(){
   const ic=S.theme==='dark'?'☀':'☽';
-  [$('thtog'),$('tmtog'),$('tb-theme')].forEach(b=>{ if(b) b.textContent=ic; });
+  const tb=$('tb-theme'); if(tb) tb.textContent=ic;
   syncAuthThemeBtn(S.theme);
 }
 function fmtTs(){ return new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
@@ -4577,8 +4580,7 @@ function renderCalDetail(ds, evs){
 // ════════════════════════════════════════════════════════
 // ACCOUNT MANAGEMENT
 // ════════════════════════════════════════════════════════
-$('btn-acct')?.addEventListener('click',()=>{ openAccountSettings(); });
-// Ubadge (sidebar user banner) also opens account settings
+// Account Settings — opened via sidebar ubadge banner click
 $('ubadge-btn')?.addEventListener('click',()=>{ closeSB(); setTimeout(openAccountSettings,150); });
 
 function openAccountSettings(){
@@ -4682,9 +4684,6 @@ function openAccountSettings(){
     });
   },50);
 } // end openAccountSettings
-
-// ── Redirect tb-logout to btn-out ────────────────────────────────────
-$('tb-logout')?.addEventListener('click',()=>$('btn-out')?.click());
 
 // ── QUICK-ADD TRANSACTION (topbar + button) ───────────────────────────
 const QA_INCOME_CATS=['Salary','Freelance','Business','Interest','Dividend','Rental','Investment Return','Stock Sale','FD Maturity','Fund Redemption','Crypto Sale','Physical Asset Sale','Gift','Refund','Other Income'];
