@@ -1843,7 +1843,8 @@ async function doSignOut(){
     if(sb && S.user){
       const did = getDeviceId();
       sb.from('registered_devices').delete()
-        .eq('user_id', S.user.id).eq('device_id', did).then(()=>{}).catch(()=>{});
+        .eq('user_id', S.user.id).eq('device_id', did)
+        .then(()=>{}).catch(()=>{});  // fire-and-forget, errors ignored
     }
   }catch(_){}
   clearVaultKey(); // wipe the encryption key from memory and localStorage
@@ -2069,8 +2070,8 @@ async function decryptField(cipherText){
     const pt  = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, _vaultKey, ct);
     return new TextDecoder().decode(pt);
   }catch{
-    // Wrong PIN or corrupted — return a placeholder so the UI doesn't crash
-    return '[encrypted]';
+    // Wrong key or corrupted data — show lock icon instead of raw ciphertext
+    return '🔒 Locked';
   }
 }
 
@@ -2165,7 +2166,8 @@ async function checkAndRegisterDevice(){
     if(existing.is_verified){
       // Update last_used (fire-and-forget)
       sb.from('registered_devices').update({ last_used: new Date().toISOString() })
-        .eq('id', existing.id).then(()=>{}).catch(()=>{});
+        .eq('id', existing.id)  // fire-and-forget
+        .then(()=>{}).catch(()=>{});
       return 'ok';
     } else {
       // Registered but magic link not yet clicked in a previous session
@@ -2533,15 +2535,16 @@ async function verifyVaultKey(key, userId, variant){
 // ── After successful unlock — shared finalise logic ───────────────────
 async function finaliseUnlock(key, isCreate){
   await persistVaultKey(key);
-  if(!isCreate){
-    // Decrypt in-memory data that was loaded raw before PIN entry
-    S.data.banks    = await decryptTable('bank_accounts',   S.data.banks);
-    S.data.loans    = await decryptTable('loans',           S.data.loans);
-    S.data.expenses = await decryptTable('expenses',        S.data.expenses);
-    S.data.income   = await decryptTable('income',          S.data.income);
-    S.data.crypto   = await decryptTable('crypto_wallets',  S.data.crypto);
-    S.data.assets   = await decryptTable('physical_assets', S.data.assets);
-  }
+  // Always decrypt in-memory data after unlock — covers both:
+  // 1. Normal unlock: data was loaded raw (no key at load time)
+  // 2. Key-restored login: loadAll may have failed to decrypt if
+  //    the key wasn't fully ready (race condition on slow devices)
+  S.data.banks    = await decryptTable('bank_accounts',   S.data.banks);
+  S.data.loans    = await decryptTable('loans',           S.data.loans);
+  S.data.expenses = await decryptTable('expenses',        S.data.expenses);
+  S.data.income   = await decryptTable('income',          S.data.income);
+  S.data.crypto   = await decryptTable('crypto_wallets',  S.data.crypto);
+  S.data.assets   = await decryptTable('physical_assets', S.data.assets);
   hideVaultOverlay();
   renderAll();
 
@@ -5907,7 +5910,7 @@ function openAccountSettings(){
             });
 
             // Step 1b: Remove all registered devices for this user
-            await sb.from('registered_devices').delete().eq('user_id', S.user.id).catch(()=>{});
+            try{ await sb.from('registered_devices').delete().eq('user_id', S.user.id); }catch(_){}
 
             // Step 2: Call the PostgreSQL RPC function that runs as SECURITY DEFINER
             // This function deletes all public table rows AND the auth.users record
