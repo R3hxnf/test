@@ -166,7 +166,6 @@ img{max-width:100%}
 .hbtn{display:none;font-size:1.3rem;color:var(--t2);cursor:pointer}
 #tbtitle{font-size:.98rem;font-weight:600;flex:1}
 .tbr{display:flex;align-items:center;gap:.7rem;margin-left:auto}
-#tmtog{display:none}
 .live{display:flex;align-items:center;gap:.38rem;font-size:.72rem;color:var(--green);font-weight:600}
 .ldot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:lpulse 2s ease-in-out infinite}
 @keyframes lpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.78)}}
@@ -324,7 +323,19 @@ img{max-width:100%}
 .mfg label{font-size:.72rem;font-weight:700;color:var(--t2);letter-spacing:.04em;text-transform:uppercase}
 .mfg input,.mfg select{width:100%;padding:.68rem .95rem;background:var(--ele);
   border:1.5px solid var(--bd);border-radius:var(--r10);font-size:.9rem;
+  height:48px;box-sizing:border-box;
   transition:border var(--tr),box-shadow var(--tr);color:var(--t1)}
+.mfg input[type="date"]{
+  color-scheme:dark;
+  background:var(--ele);color:var(--t1);
+}
+[data-theme=light] .mfg input[type="date"]{
+  color-scheme:light;
+  background:var(--ele);color:var(--t1);
+}
+.mfg textarea{width:100%;padding:.68rem .95rem;background:var(--ele);
+  border:1.5px solid var(--bd);border-radius:var(--r10);font-size:.9rem;
+  transition:border var(--tr),box-shadow var(--tr);color:var(--t1);resize:vertical;min-height:80px;box-sizing:border-box}
 .mfg input:focus,.mfg select:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--bgl)}
 .mfg select option{background:var(--ele);color:var(--t1)}
 .mcl{width:30px;height:30px;display:flex;align-items:center;justify-content:center;
@@ -399,8 +410,6 @@ img{max-width:100%}
 .alogo-svg{width:44px;height:44px;flex-shrink:0}
 
 .emp{grid-column:1/-1;text-align:center;color:var(--t2);padding:2.5rem;font-size:.875rem}
-.stup{font-size:.75rem;color:var(--t2);margin-top:.2rem}
-
 /* stock price badge */
 .live-price{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;
   background:rgba(74,222,128,.1);color:var(--green);border-radius:99px;
@@ -814,6 +823,13 @@ img{max-width:100%}
       </button>
     </div>
     <p id="amsg"></p>
+    <!-- Theme toggle + branding footer -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1.4rem;padding-top:1rem;border-top:1px solid var(--bd)">
+      <button id="auth-theme-btn" title="Toggle theme" style="display:flex;align-items:center;gap:.45rem;font-size:.75rem;font-weight:600;color:var(--t2);background:none;border:1.5px solid var(--bd);border-radius:99px;padding:.32rem .8rem;cursor:pointer;transition:all var(--tr)">
+        <span id="auth-theme-icon">☀</span><span id="auth-theme-lbl">Light</span>
+      </button>
+      <p style="font-size:.7rem;color:var(--t3);margin:0">Made by <strong style="color:var(--t2)">Rehan Fernando</strong></p>
+    </div>
   </div>
 </div>
 
@@ -852,9 +868,9 @@ img{max-width:100%}
       <a class="ni" data-s="calendar"><span class="ni-dot">◉</span> Calendar</a>
     </nav>
     <div class="sbf">
-      <div class="ubadge">
+      <div class="ubadge" id="ubadge-btn" title="Account Settings" style="cursor:pointer;border-radius:var(--r10);padding:.35rem;margin:-.35rem;transition:background var(--tr)" onmouseover="this.style.background='var(--gl2)'" onmouseout="this.style.background=''">
         <div class="uav" id="uav">A</div>
-        <div><div class="un" id="uname">User</div><div class="ur">Personal Account</div></div>
+        <div><div class="un" id="uname">User</div><div class="ur">Tap to manage account</div></div>
       </div>
       <div class="sbacts">
         <button class="iBtn" id="thtog"  title="Theme">☽</button>
@@ -875,7 +891,6 @@ img{max-width:100%}
         <button class="btn bp" id="tb-qadd" style="font-size:.78rem;padding:.42rem .85rem;gap:.3rem" title="Quick add transaction">＋ Add</button>
       </div>
       <div class="tb-actions">
-        <button class="iBtn" id="tb-qadd-m" title="Quick add">＋</button>
         <button class="iBtn" id="tb-theme" title="Toggle theme">☽</button>
         <button class="iBtn" id="tb-logout" title="Sign out" style="font-size:.85rem">⏻</button>
       </div>
@@ -924,6 +939,9 @@ img{max-width:100%}
         <div class="ins gc"><h3>🤖 AI Insights</h3><div class="insl" id="ins-list">
           <div class="insit"><span class="insic">⏳</span><p>Loading insights…</p></div>
         </div></div>
+        <div style="text-align:center;padding:1.2rem 0 .4rem;font-size:.72rem;color:var(--t3)">
+          Made with ♥ by <strong style="color:var(--t2)">Rehan Fernando</strong> · Finova Personal Finance
+        </div>
       </section>
 
       <!-- BANKS -->
@@ -1169,26 +1187,52 @@ img{max-width:100%}
 <div class="sbbd dn" id="fab-bd"></div>
 
 <!-- PASSWORD RESET OVERLAY (shown when URL has #type=recovery) -->
-<div class="auth-ov dn" id="reset-ov" style="z-index:10000">
-  <div class="orbs"><div class="orb o1"></div><div class="orb o2"></div></div>
-  <div class="acard">
-    <div class="alogo">
-      <svg class="alogo-svg" viewBox="0 0 44 44" fill="none">
-        <rect width="44" height="44" rx="12" fill="#3b82f6"/>
-        <rect width="44" height="44" rx="12" fill="white" fill-opacity="0.08"/>
-        <rect x="10" y="10" width="7" height="24" rx="2" fill="white"/>
-        <rect x="10" y="10" width="23" height="7" rx="2" fill="white"/>
-        <rect x="10" y="21" width="18" height="7" rx="2" fill="white"/>
-      </svg>
-      <span class="alogo-t">Finova</span>
+<!-- ══════════ PASSWORD RESET OVERLAY (triggered by PASSWORD_RECOVERY event) ══════════ -->
+<div id="reset-ov" class="dn" style="
+  position:fixed;inset:0;z-index:99999;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  padding:1.2rem;animation:sIn .25s ease both">
+  <div style="
+    width:100%;max-width:420px;
+    background:var(--gl);backdrop-filter:blur(40px) saturate(180%);
+    border:1.5px solid var(--bd2);border-radius:var(--r22);
+    box-shadow:0 24px 64px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08);
+    padding:2.2rem 2rem;animation:sup .3s cubic-bezier(.4,0,.2,1) both">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.35rem">
+      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--blue),#6366f1);
+        display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">🔐</div>
+      <div>
+        <div style="font-size:1.15rem;font-weight:700;letter-spacing:-.03em">Set New Password</div>
+        <div style="font-size:.78rem;color:var(--t2);margin-top:.1rem">Choose a strong password for your account</div>
+      </div>
     </div>
-    <p class="atag" style="margin-bottom:1.4rem">Set a new password for your account.</p>
-    <div class="fg" style="margin-bottom:.9rem"><label>New Password</label>
-      <input id="rp-pw1" type="password" placeholder="Min. 6 characters" autocomplete="new-password"/></div>
-    <div class="fg" style="margin-bottom:.9rem"><label>Confirm Password</label>
-      <input id="rp-pw2" type="password" placeholder="Repeat password" autocomplete="new-password"/></div>
-    <button id="btn-reset-pw" class="btn bp bfull">Set New Password</button>
-    <p id="rp-msg" style="min-height:1rem;font-size:.8rem;text-align:center;margin-top:.6rem"></p>
+    <!-- Progress indicator -->
+    <div style="height:3px;background:var(--ele);border-radius:99px;margin:1.2rem 0 1.5rem;overflow:hidden">
+      <div id="rp-progress" style="height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--teal));border-radius:99px;transition:width .3s ease"></div>
+    </div>
+    <!-- Fields -->
+    <div style="display:flex;flex-direction:column;gap:.85rem;margin-bottom:1.1rem">
+      <div class="fg">
+        <label>New Password</label>
+        <input id="rp-pw1" type="password" placeholder="Min. 6 characters" autocomplete="new-password"
+          style="height:48px;font-size:15px"/>
+      </div>
+      <div class="fg">
+        <label>Confirm Password</label>
+        <input id="rp-pw2" type="password" placeholder="Repeat password" autocomplete="new-password"
+          style="height:48px;font-size:15px"/>
+      </div>
+      <!-- Live strength indicator -->
+      <div id="rp-strength" style="font-size:.74rem;color:var(--t3);min-height:1rem;margin-top:-.4rem"></div>
+    </div>
+    <button id="btn-reset-pw" class="btn bp bfull" style="height:48px;font-size:.93rem;font-weight:700">
+      Update Password
+    </button>
+    <p id="rp-msg" style="min-height:1.1rem;font-size:.8rem;font-weight:600;text-align:center;margin-top:.75rem;color:var(--red)"></p>
+    <!-- Branding -->
+    <p style="text-align:center;font-size:.68rem;color:var(--t3);margin-top:1rem">Finova · Secure password update</p>
   </div>
 </div>
 
@@ -1294,19 +1338,38 @@ function applyTheme(t){
 applyTheme(S.theme);
 [$('thtog'),$('tmtog')].forEach(b=>b&&b.addEventListener('click',()=>applyTheme(S.theme==='dark'?'light':'dark')));
 
-// Mobile topbar theme + logout (tb-logout already wired at bottom — skip dupe)
+// Mobile topbar theme
 $('tb-theme')?.addEventListener('click',()=>applyTheme(S.theme==='dark'?'light':'dark'));
 
-// Sync tb-theme icon
+// Auth page theme toggle (on login screen, before user is signed in)
+// Wired directly to the DOM element (not via init state machine)
+document.getElementById('auth-theme-btn')?.addEventListener('click',()=>{
+  const cur=document.documentElement.getAttribute('data-theme')||'dark';
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('fv_theme',next);
+  // Also update S.theme if available
+  if(typeof S!=='undefined') S.theme=next;
+  syncAuthThemeBtn(next);
+});
+function syncAuthThemeBtn(t){
+  const icon=document.getElementById('auth-theme-icon');
+  const lbl=document.getElementById('auth-theme-lbl');
+  if(icon) icon.textContent=t==='dark'?'☀':'☽';
+  if(lbl)  lbl.textContent=t==='dark'?'Light':'Dark';
+}
+// Initialise auth theme button to reflect current theme
+syncAuthThemeBtn(S.theme);
+
+// Sync all theme icons in app
 function syncThemeIcons(){
   const ic=S.theme==='dark'?'☀':'☽';
   [$('thtog'),$('tmtog'),$('tb-theme')].forEach(b=>{ if(b) b.textContent=ic; });
+  syncAuthThemeBtn(S.theme);
 }
 function fmtTs(){ return new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
-function setLU(id){ const e=$(id); if(e){ e.textContent='Updated: '+fmtTs(); } }
 // Global last updated for overview
 function touchGlobal(){ localStorage.setItem('fv_lu_global_'+S.user?.id, fmtTs()); const e=$('lu-dash'); if(e) e.textContent='Updated: '+(localStorage.getItem('fv_lu_global_'+S.user?.id)||'—'); }
-function loadLU(id,key){ const e=$(id); if(e) e.textContent='Updated: '+(localStorage.getItem('fv_lu_'+key+'_'+S.user?.id)||'—'); }
 function saveLU(key){ const v=fmtTs(); localStorage.setItem('fv_lu_'+key+'_'+S.user?.id,v); touchGlobal(); return v; }
 
 // ── AUTH MESSAGE ──────────────────────────────────────────────────────
@@ -1357,30 +1420,33 @@ $('btn-forgot')?.addEventListener('click',async()=>{
 });
 
 // ── GOOGLE OAUTH ──────────────────────────────────────────────────────
+// Production URL — change this if you deploy elsewhere
+const PROD_URL='https://finovasmart.netlify.app';
+
 async function signInWithGoogle(e){
   if(!sb){ amsg('Supabase not configured.'); return; }
-  // Capture the specific button that was clicked — document.activeElement is
-  // unreliable on mobile (iOS/Android) and can return document.body, which
-  // would wipe the entire page when we set .textContent on it.
+  // Use e.currentTarget — document.activeElement is unreliable on mobile iOS/Android
   const btn=e?.currentTarget||null;
   const origHTML=btn?btn.innerHTML:null;
   if(btn){ btn.disabled=true; btn.innerHTML=`<span style="display:inline-flex;align-items:center;gap:.5rem"><svg viewBox="0 0 24 24" width="18" height="18" style="animation:spin .7s linear infinite"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="30 60" stroke-linecap="round"/></svg>Redirecting…</span>`; }
   amsg('');
   try{
-    const redirectTo=window.location.origin+window.location.pathname;
+    // Use production URL on deployed site, current origin in local dev
+    // This prevents the mobile black-screen issue caused by mismatched redirect URLs
+    const isLocal=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'||window.location.protocol==='file:';
+    const redirectTo=isLocal?(window.location.origin+window.location.pathname):PROD_URL;
     const {error}=await sb.auth.signInWithOAuth({
       provider:'google',
       options:{
         redirectTo,
-        // Remove prompt:'consent' — it forces re-consent every login which breaks mobile flow
-        // Remove access_type:'offline' — not needed for browser-based apps
+        skipBrowserRedirect:false,  // ensures full-page redirect on mobile (no popup)
       }
     });
     if(error){
       amsg(error.message);
       if(btn){ btn.disabled=false; btn.innerHTML=origHTML; }
     }
-    // On success the browser navigates to Google — no further code runs
+    // On success the browser navigates away — no further JS needed here
   }catch(e2){
     amsg('Google sign-in error: '+e2.message);
     if(btn){ btn.disabled=false; btn.innerHTML=origHTML; }
@@ -1391,35 +1457,113 @@ $('btn-google-signin')?.addEventListener('click', signInWithGoogle);
 $('btn-google-signup')?.addEventListener('click', signInWithGoogle);
 
 // ── PASSWORD RESET PAGE (fires when email link redirects here) ─────────
-(function checkPasswordReset(){
-  const hash=window.location.hash||'';
-  const params=new URLSearchParams(hash.replace('#',''));
-  const isReset=params.get('type')==='recovery'||hash.includes('type=recovery');
-  if(!isReset) return;
-  // Show reset overlay, hide normal auth
-  const ro=$('reset-ov'); if(ro) ro.classList.remove('dn');
-  const ao=$('auth-ov'); if(ao) ao.classList.add('dn');
-  // Supabase sets the session from the URL hash automatically
-  $('btn-reset-pw')?.addEventListener('click',async()=>{
-    const pw1=($('rp-pw1').value||'');
-    const pw2=($('rp-pw2').value||'');
+// ── RESET PASSWORD MODAL ──────────────────────────────────────────────
+// Called by onAuthStateChange when event==='PASSWORD_RECOVERY'
+// Shows the inline password reset overlay over whatever is currently visible.
+function showResetPasswordModal(){
+  const ov=$('reset-ov');
+  if(!ov) return;
+
+  // Hide the auth screen if visible, show the reset overlay
+  $('auth-ov')?.classList.add('dn');
+  ov.classList.remove('dn');
+  ov.style.display='flex';
+
+  // Focus first field
+  setTimeout(()=>$('rp-pw1')?.focus(), 80);
+
+  // ── Live password strength indicator ─────────────────────────────
+  $('rp-pw1')?.addEventListener('input',()=>{
+    const pw=$('rp-pw1').value;
+    const bar=$('rp-progress');
+    const msg=$('rp-strength');
+    if(!pw){ if(bar) bar.style.width='0%'; if(msg) msg.textContent=''; return; }
+    let score=0;
+    if(pw.length>=6) score++;
+    if(pw.length>=10) score++;
+    if(/[A-Z]/.test(pw)) score++;
+    if(/[0-9]/.test(pw)) score++;
+    if(/[^A-Za-z0-9]/.test(pw)) score++;
+    const labels=[null,'Weak','Fair','Good','Strong','Very Strong'];
+    const colors=[null,'var(--red)','var(--amber)','var(--amber)','var(--green)','var(--teal)'];
+    const widths=[0,20,40,60,80,100];
+    if(bar){ bar.style.width=widths[score]+'%'; bar.style.background=colors[score]||'var(--blue)'; }
+    if(msg){ msg.textContent=score>0?labels[score]+' password':''; msg.style.color=colors[score]||'var(--t2)'; }
+  });
+
+  // ── Confirm field match indicator ─────────────────────────────────
+  $('rp-pw2')?.addEventListener('input',()=>{
+    const msg=$('rp-msg');
+    const v1=$('rp-pw1').value, v2=$('rp-pw2').value;
+    if(!v2) { if(msg) msg.textContent=''; return; }
+    if(v1===v2){ msg.textContent='✓ Passwords match'; msg.style.color='var(--green)'; }
+    else        { msg.textContent='Passwords do not match'; msg.style.color='var(--red)'; }
+  });
+
+  // ── Submit handler ────────────────────────────────────────────────
+  const btn=$('btn-reset-pw');
+  if(btn) btn.onclick=async()=>{
+    const pw1=($('rp-pw1').value||'').trim();
+    const pw2=($('rp-pw2').value||'').trim();
     const msg=$('rp-msg');
     msg.textContent=''; msg.style.color='var(--red)';
-    if(pw1.length<6){ msg.textContent='Password must be at least 6 characters.'; return; }
-    if(pw1!==pw2){ msg.textContent='Passwords do not match.'; return; }
-    if(!sb){ msg.textContent='Supabase not configured.'; return; }
+
+    if(pw1.length<6){  msg.textContent='Password must be at least 6 characters.'; return; }
+    if(pw1!==pw2){     msg.textContent='Passwords do not match.'; return; }
+    if(!sb){           msg.textContent='Supabase not configured.'; return; }
+
+    btn.disabled=true; btn.textContent='Updating…';
     const {error}=await sb.auth.updateUser({password:pw1});
-    if(error){ msg.textContent=error.message; }
-    else{
+    btn.disabled=false; btn.textContent='Update Password';
+
+    if(error){
+      msg.textContent=error.message;
+    } else {
+      // ✅ Success — close modal, clear hash, show toast, land on dashboard
       msg.style.color='var(--green)';
-      msg.textContent='✅ Password updated! Signing you in…';
-      setTimeout(()=>{
-        const ro=$('reset-ov'); if(ro) ro.classList.add('dn');
-        window.location.hash='';
-      },1800);
+      msg.textContent='✅ Password updated successfully!';
+
+      // Close overlay and clear the recovery hash from the URL
+      setTimeout(async()=>{
+        ov.classList.add('dn');
+        ov.style.display='';
+        if(window.location.hash) window.history.replaceState(null,'',window.location.pathname+window.location.search);
+
+        // Ensure dashboard is visible (it may not have launched yet if user
+        // arrived cold from the email link)
+        if($('app').classList.contains('dn')){
+          if(!S.user&&sb){
+            const {data:{session}}=await sb.auth.getSession();
+            if(session?.user){ S.user=session.user; await loadAll(); launch(); }
+          } else if(S.user){
+            launch();
+          }
+        }
+        toast('🔐 Password updated! You are now signed in.','s');
+      }, 1400);
     }
-  });
-  [$('rp-pw1'),$('rp-pw2')].forEach(i=>i?.addEventListener('keydown',e=>{ if(e.key==='Enter') $('btn-reset-pw')?.click(); }));
+  };
+
+  // Enter key on both fields
+  [$('rp-pw1'),$('rp-pw2')].forEach(i=>i?.addEventListener('keydown',e=>{
+    if(e.key==='Enter') $('btn-reset-pw')?.click();
+  }));
+}
+
+// ── Legacy URL-hash recovery fallback ─────────────────────────────────
+// Handles old-style Supabase v1 links that embed the tokens in the hash.
+// The onAuthStateChange PASSWORD_RECOVERY event is the primary path;
+// this catches any edge cases where the event fires before the listener is ready.
+(function checkHashRecovery(){
+  const hash=window.location.hash||'';
+  if(!hash.includes('type=recovery')) return;
+  // Give the Supabase SDK 800ms to parse the hash and fire the event.
+  // If it hasn't shown the modal yet, open it manually.
+  setTimeout(()=>{
+    if(!$('reset-ov') || $('reset-ov').classList.contains('dn')){
+      showResetPasswordModal();
+    }
+  }, 800);
 })();
 
 // ── CENTRAL FAB (quick add / transfer) ────────────────────────────────
@@ -1548,28 +1692,42 @@ $('btn-out').addEventListener('click',async()=>{
 });
 
 // ── AUTH STATE CHANGE — single launch point ───────────────────────────
-// Fires for: email/password sign-in, Google OAuth callback, token refresh, page reload
+// Handles: email/password, Google OAuth, token refresh, PASSWORD_RECOVERY
 if(sb){
   sb.auth.onAuthStateChange(async(event,session)=>{
+
+    // ── PASSWORD RECOVERY — user clicked the email reset link ─────────
+    // Supabase auto-authenticates the user via the link tokens and fires
+    // this event. We intercept it before the dashboard launches and show
+    // the inline password reset modal instead.
+    if(event==='PASSWORD_RECOVERY'){
+      S.user=session?.user||S.user;
+    // If the dashboard hasn't loaded yet, silently launch it in background
+    // so the user lands on their dashboard after resetting (not the auth screen)
+    if($('app').classList.contains('dn')){
+      if(session?.user&&!S.user){ S.user=session.user; await loadAll(); launch(); }
+    }
+      showResetPasswordModal();
+      return; // Do NOT fall through to normal login flow
+    }
+
+    // ── NORMAL SIGNED_IN / INITIAL_SESSION ────────────────────────────
     if((event==='SIGNED_IN' || event==='INITIAL_SESSION') && session?.user && !S.user){
       S.user = session.user;
 
-      // ── Google OAuth first-time onboarding ────────────────────────
-      // If the user signed in via Google and has no data rows yet,
-      // we treat it as a clean new account (Net Worth = 0, no pre-load noise).
-      // The provider check ensures we only do this for OAuth users.
+      // Google OAuth first-time onboarding
       const isOAuth=session.user?.app_metadata?.provider==='google'||
                     (session.user?.identities||[]).some(id=>id.provider==='google');
       const isNewOAuth=isOAuth && event==='SIGNED_IN' &&
                        !session.user?.user_metadata?.finova_initialized;
       if(isNewOAuth&&sb){
-        // Mark as initialized so we don't repeat this on subsequent logins
         await sb.auth.updateUser({data:{finova_initialized:true}}).catch(()=>{});
       }
 
       await loadAll();
       launch();
     }
+
     if(event==='SIGNED_OUT'){
       S.user=null;
     }
@@ -1781,8 +1939,6 @@ function launch(){
   const name=S.user?.user_metadata?.full_name||S.user?.email?.split('@')[0]||'User';
   setText('uname',name); setText('gname',name.split(' ')[0]);
   $('uav').textContent=name[0].toUpperCase();
-  // init cash display
-  const cd=$('cash-display'); if(cd) cd.textContent=fmt(getCash());
   // sync theme icons including mobile topbar
   syncThemeIcons();
   // load per-section last-updated timestamps
@@ -1939,24 +2095,6 @@ function svgSparkline(data,w,h,color){
     <path d="${fill}" fill="url(#sg)"/>
     <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
-}
-
-function svgBars(labels,values,w,h){
-  if(!labels||!labels.length) return '<p style="color:var(--t2);padding:1.5rem;text-align:center;font-size:.82rem">No data yet</p>';
-  const max=Math.max(...values,1);
-  const pH=22, pT=8, pL=0, pR=0;
-  const bW=((w-pL-pR)/labels.length)*0.62;
-  const gap=((w-pL-pR)/labels.length);
-  const tc=getComputedStyle(document.documentElement).getPropertyValue('--t2').trim()||'#888';
-  let out='';
-  labels.forEach((l,i)=>{
-    const bh=Math.max(2,((values[i]||0)/max)*(h-pH-pT));
-    const x=pL+i*gap+(gap-bW)/2;
-    const y=pT+(h-pH-pT)-bh;
-    out+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bW.toFixed(1)}" height="${bh.toFixed(1)}" rx="4" fill="${PALETTE[0]}" opacity=".82"/>
-    <text x="${(x+bW/2).toFixed(1)}" y="${h-2}" text-anchor="middle" font-size="10" fill="${tc}">${l}</text>`;
-  });
-  return `<svg width="${w}" height="${h}" style="display:block;width:100%;overflow:visible" viewBox="0 0 ${w} ${h}">${out}</svg>`;
 }
 
 function svgDonut(labels,values,size){
@@ -3502,9 +3640,8 @@ function addCashLog(type,amt,note){ // type: 'in'|'out'
   if(log.length>200) log.length=200; // keep last 200 entries
   localStorage.setItem('fv_cashlog_'+S.user.id,JSON.stringify(log));
 }
-function setCash(v,logEntry){
+function setCash(v){
   localStorage.setItem('fv_cash_'+S.user.id, v);
-  const d=$('cash-display'); if(d) d.textContent=fmt(v);
   const d3=$('cash-page-bal'); if(d3) d3.textContent=fmt(v);
 }
 
@@ -4440,7 +4577,11 @@ function renderCalDetail(ds, evs){
 // ════════════════════════════════════════════════════════
 // ACCOUNT MANAGEMENT
 // ════════════════════════════════════════════════════════
-$('btn-acct')?.addEventListener('click',()=>{
+$('btn-acct')?.addEventListener('click',()=>{ openAccountSettings(); });
+// Ubadge (sidebar user banner) also opens account settings
+$('ubadge-btn')?.addEventListener('click',()=>{ closeSB(); setTimeout(openAccountSettings,150); });
+
+function openAccountSettings(){
   if(!sb||!S.user){ toast('Not connected to Supabase.','e'); return; }
   const user=S.user;
   const email=user.email||'';
@@ -4540,34 +4681,12 @@ $('btn-acct')?.addEventListener('click',()=>{
       );
     });
   },50);
-});
+} // end openAccountSettings
 
 // ── Redirect tb-logout to btn-out ────────────────────────────────────
 $('tb-logout')?.addEventListener('click',()=>$('btn-out')?.click());
 
 // ── QUICK-ADD TRANSACTION (topbar + button) ───────────────────────────
-const AUTO_DESCS={
-  'Salary':'Monthly salary credit',
-  'Freelance':'Freelance payment received',
-  'Business':'Business income',
-  'Interest':'Interest income',
-  'Dividend':'Dividend payment',
-  'Rental':'Rental income',
-  'Stock Sale':'Stock Sale — proceeds',
-  'FD Maturity':'Fixed Deposit Withdrawal — maturity proceeds',
-  'Fund Redemption':'Fund Redemption — proceeds',
-  'Crypto Sale':'Crypto Sale — proceeds',
-  'Physical Asset Sale':'Physical Assets Transfer — asset proceeds',
-  'Loan Repayment':'Loan repayment',
-  'Food':'Food & dining',
-  'Transport':'Transport',
-  'Utilities':'Utilities & bills',
-  'Entertainment':'Entertainment',
-  'Healthcare':'Healthcare',
-  'Shopping':'Shopping',
-  'Education':'Education',
-};
-
 const QA_INCOME_CATS=['Salary','Freelance','Business','Interest','Dividend','Rental','Investment Return','Stock Sale','FD Maturity','Fund Redemption','Crypto Sale','Physical Asset Sale','Gift','Refund','Other Income'];
 const QA_EXPENSE_CATS=['Food','Transport','Rent','Bills & Utilities','Healthcare','Shopping','Education','Entertainment','Loan Repayment','Insurance','Maintenance','Subscription','Others'];
 
@@ -4745,7 +4864,7 @@ function openQuickAdd(){
   };
 }
 
-['tb-qadd','tb-qadd-m'].forEach(id=>{ $(id)?.addEventListener('click',openQuickAdd); });
+$('tb-qadd')?.addEventListener('click', openQuickAdd);
 
 } // end init()
 })();
