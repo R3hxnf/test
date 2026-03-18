@@ -2835,7 +2835,7 @@ async function dbInsert(tbl,record){
 // ── SUPABASE DELETE ───────────────────────────────────────────────────
 async function dbDelete(tbl,id){
   if(!sb) return {error:null};
-  return sb.from(tbl).delete().eq('id',id).eq('user_id',S.user.id);
+  return await sb.from(tbl).delete().eq('id',id).eq('user_id',S.user.id);
 }
 
 // ── UNIFIED LEDGER — write every financial event here ─────────────────
