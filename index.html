@@ -148,12 +148,42 @@ img{max-width:100%}
 .ni.on{background:linear-gradient(135deg,rgba(59,130,246,.16),rgba(59,130,246,.05));
   color:var(--blue);border-color:rgba(59,130,246,.24)}.ni.on .ni-dot{color:var(--blue)}
 .sbf{padding:.95rem 1.2rem;border-top:1px solid var(--bd)}
-.ubadge{display:flex;align-items:center;gap:.7rem;margin-bottom:.5rem}
-.ubadge:hover{background:var(--gl2)}
+
+/* Avatar */
 .uav{width:36px;height:36px;border-radius:50%;
   background:linear-gradient(135deg,var(--blue),var(--purple));
   display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;color:#fff;flex-shrink:0}
 .un{font-size:.875rem;font-weight:600}.ur{font-size:.72rem;color:var(--t2)}
+
+/* Desktop profile banner — sits at bottom of sidebar */
+.ubadge{display:flex;align-items:center;gap:.7rem;margin-bottom:.5rem;
+  cursor:pointer;border-radius:var(--r10);padding:.45rem .5rem;margin:0 -.5rem .5rem;
+  transition:background var(--tr)}
+.ubadge:hover{background:var(--gl2)}
+.ubadge-desktop{display:flex;align-items:center;gap:.7rem;cursor:pointer;
+  border-radius:var(--r10);padding:.45rem .5rem;margin:0 -.5rem .5rem;
+  transition:background var(--tr)}
+.ubadge-desktop:hover{background:var(--gl2)}
+
+/* Mobile profile banner — shown at top of drawer, hidden on desktop */
+.sb-profile-banner{
+  display:none;
+  align-items:center;gap:.9rem;
+  padding:1.1rem 1.2rem 1rem;
+  border-bottom:1px solid var(--bd);
+  cursor:pointer;
+  background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(167,139,250,.05));
+  -webkit-tap-highlight-color:transparent;
+  transition:background var(--tr);
+}
+.sb-profile-banner:active{background:var(--gl2)}
+.sb-profile-banner .uav{width:44px;height:44px;font-size:1.1rem;flex-shrink:0}
+.sb-profile-info{flex:1;min-width:0}
+.sb-profile-info .un{font-size:1rem;font-weight:700;letter-spacing:-.01em}
+.sb-profile-info .ur{font-size:.74rem;color:var(--t2);margin-top:.1rem;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-signout{opacity:.5;font-size:.85rem;flex-shrink:0;transition:opacity var(--tr)}
+.sb-signout:hover{opacity:1}
 .sbbd{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
 .sbbd.on{display:block}
 
@@ -495,8 +525,17 @@ img{max-width:100%}
 /* ── TOPBAR MOBILE ACTIONS ── */
 .tb-actions{display:none;align-items:center;gap:.35rem;margin-left:.25rem}
 @media(max-width:860px){
-  .tb-actions{display:flex}
-  .tb-actions .iBtn{width:34px;height:34px;font-size:.95rem;flex-shrink:0}
+  /* Show mobile profile banner at top of drawer */
+  .sb-profile-banner{display:flex}
+  /* Hide the desktop banner inside sbf on mobile */
+  .ubadge-desktop{display:none!important}
+
+  /* Topbar: push theme + refresh to the far right corner */
+  .tb{padding:.75rem 1rem}
+  .tbr{margin-left:auto;gap:.4rem}
+  .tbr .live{display:none}         /* hide "Live" text on mobile */
+  #tb-qadd{display:none}           /* FAB handles quick-add on mobile */
+  .tbr .iBtn{width:38px;height:38px}
 }
 
 /* ── CASH STATEMENT ── */
@@ -833,12 +872,12 @@ img{max-width:100%}
 <div id="app" class="dn">
   <div class="sbbd" id="sbbd"></div>
   <aside class="sb" id="sb">
+    <!-- Sidebar header: logo + close on desktop, profile banner on mobile -->
     <div class="sbh">
       <div class="logo">
         <svg class="logo-svg" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect width="32" height="32" rx="8" fill="#3b82f6"/>
           <rect width="32" height="32" rx="8" fill="white" fill-opacity="0.08"/>
-          <!-- F letterform -->
           <rect x="7" y="7" width="5" height="18" rx="1.5" fill="white"/>
           <rect x="7" y="7" width="17" height="5" rx="1.5" fill="white"/>
           <rect x="7" y="15" width="13" height="5" rx="1.5" fill="white"/>
@@ -847,6 +886,18 @@ img{max-width:100%}
       </div>
       <button id="sbclose" class="iBtn">✕</button>
     </div>
+
+    <!-- Mobile-only profile banner at top of drawer -->
+    <div class="sb-profile-banner" id="ubadge-btn" title="Account Settings">
+      <div class="uav" id="uav">A</div>
+      <div class="sb-profile-info">
+        <div class="un" id="uname">User</div>
+        <div class="ur">Tap to manage account &nbsp;⚙</div>
+      </div>
+      <button id="btn-out" class="iBtn sb-signout" title="Sign out"
+        onclick="event.stopPropagation()">⏻</button>
+    </div>
+
     <nav class="sbnav">
       <a class="ni on"  data-s="dash">    <span class="ni-dot">◉</span> Overview</a>
       <a class="ni" data-s="banks">   <span class="ni-dot">◉</span> Bank Accounts</a>
@@ -863,23 +914,20 @@ img{max-width:100%}
       <a class="ni" data-s="networth"><span class="ni-dot">◉</span> Net Worth</a>
       <a class="ni" data-s="calendar"><span class="ni-dot">◉</span> Calendar</a>
     </nav>
+
     <div class="sbf">
-      <!-- Clickable profile banner — opens Account Settings -->
-      <div class="ubadge" id="ubadge-btn" title="Account Settings"
-        style="cursor:pointer;border-radius:var(--r10);padding:.45rem .5rem;margin:0 -.5rem;
-               transition:background var(--tr)">
-        <div class="uav" id="uav">A</div>
+      <!-- Desktop-only profile banner at bottom -->
+      <div class="ubadge ubadge-desktop" title="Account Settings">
+        <div class="uav uav-d">A</div>
         <div style="flex:1;min-width:0">
-          <div class="un" id="uname">User</div>
-          <div class="ur" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⚙ Manage account</div>
+          <div class="un" id="uname-d">User</div>
+          <div class="ur">⚙ Manage account</div>
         </div>
-        <!-- Sign out stays inside banner row -->
-        <button id="btn-out" class="iBtn" title="Sign out"
-          style="flex-shrink:0;opacity:.6;font-size:.85rem"
+        <button id="btn-out-d" class="iBtn" title="Sign out"
+          style="flex-shrink:0;opacity:.55;font-size:.85rem"
           onclick="event.stopPropagation()">⏻</button>
       </div>
-      <!-- Branding -->
-      <p style="font-size:.65rem;color:var(--t3);text-align:center;margin-top:.7rem;line-height:1.5">
+      <p style="font-size:.65rem;color:var(--t3);text-align:center;margin-top:.6rem">
         Made by <strong style="color:var(--t2)">Rehan Fernando</strong>
       </p>
     </div>
@@ -894,9 +942,6 @@ img{max-width:100%}
         <button class="iBtn" id="rf-btn" title="Refresh prices">↻</button>
         <button class="iBtn" id="tb-theme" title="Toggle theme">☽</button>
         <button class="btn bp" id="tb-qadd" style="font-size:.78rem;padding:.42rem .85rem;gap:.3rem" title="Quick add">＋ Add</button>
-      </div>
-      <!-- Mobile-only overflow actions (theme already in tbr above) -->
-      <div class="tb-actions">
       </div>
     </header>
 
@@ -1686,13 +1731,15 @@ $('btn-signup').addEventListener('click', async()=>{
 [$('su-nm'),$('su-em'),$('su-pw')].forEach(i=>i&&i.addEventListener('keydown',e=>{ if(e.key==='Enter') $('btn-signup').click(); }));
 
 // ── LOGOUT ────────────────────────────────────────────────────────────
-$('btn-out').addEventListener('click',async()=>{
+async function doSignOut(){
   clearInterval(S.stockRefreshTimer);
   if(S.realtimeChannel&&sb) sb.removeChannel(S.realtimeChannel);
   if(sb) await sb.auth.signOut();
   S.user=null;
   location.reload();
-});
+}
+$('btn-out').addEventListener('click', doSignOut);
+$('btn-out-d')?.addEventListener('click', doSignOut);
 
 // ── AUTH STATE CHANGE — single launch point ───────────────────────────
 // Handles: email/password, Google OAuth, token refresh, PASSWORD_RECOVERY
@@ -1941,7 +1988,10 @@ function launch(){
   $('app').classList.remove('dn');
   const name=S.user?.user_metadata?.full_name||S.user?.email?.split('@')[0]||'User';
   setText('uname',name); setText('gname',name.split(' ')[0]);
-  $('uav').textContent=name[0].toUpperCase();
+  setText('uname-d',name);
+  const initials=name[0].toUpperCase();
+  $('uav').textContent=initials;
+  const uavD=$('uav-d'); if(uavD) uavD.textContent=initials;
   // sync theme icons including mobile topbar
   syncThemeIcons();
   // load per-section last-updated timestamps
@@ -4580,8 +4630,9 @@ function renderCalDetail(ds, evs){
 // ════════════════════════════════════════════════════════
 // ACCOUNT MANAGEMENT
 // ════════════════════════════════════════════════════════
-// Account Settings — opened via sidebar ubadge banner click
+// Account Settings — ubadge-btn (mobile banner) and desktop banner
 $('ubadge-btn')?.addEventListener('click',()=>{ closeSB(); setTimeout(openAccountSettings,150); });
+document.querySelector('.ubadge-desktop')?.addEventListener('click', openAccountSettings);
 
 function openAccountSettings(){
   if(!sb||!S.user){ toast('Not connected to Supabase.','e'); return; }
@@ -4629,7 +4680,13 @@ function openAccountSettings(){
       if(error){ msgEl.textContent=error.message;msgEl.style.color='var(--red)'; }
       else{
         msgEl.textContent='✅ Account updated successfully!';msgEl.style.color='var(--green)';
-        if(newName){ setText('uname',newName); setText('gname',newName.split(' ')[0]); $('uav').textContent=newName[0].toUpperCase(); }
+        if(newName){
+          setText('uname',newName); setText('uname-d',newName);
+          setText('gname',newName.split(' ')[0]);
+          const ini=newName[0].toUpperCase();
+          $('uav').textContent=ini;
+          const uavD=$('uav-d'); if(uavD) uavD.textContent=ini;
+        }
         setTimeout(()=>{ $('msave').textContent=origSaveLabel; $('msave').onclick=origSave; $('msave').disabled=false; closeModal(); },1500);
         return;
       }
