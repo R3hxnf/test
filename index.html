@@ -8,11 +8,27 @@
 
 <!-- ╔══════════════════════════════════════════════════════════════╗
      ║  ⚙️  CONFIGURATION — Replace all YOUR_... values below      ║
+     ╠══════════════════════════════════════════════════════════════╣
+     ║  ⚠️  PRODUCTION SECURITY NOTICE                             ║
+     ║  The API keys below are intentionally exposed for local     ║
+     ║  development / self-hosting ONLY.                           ║
+     ║                                                             ║
+     ║  Before deploying to a public URL, move ALL keys in         ║
+     ║  window.CFG into Supabase Edge Functions (or a backend      ║
+     ║  proxy) so they are never sent to the browser:              ║
+     ║    • FINNHUB_KEY        → Edge Function: /stock-price       ║
+     ║    • ALPHA_VANTAGE_KEY  → Edge Function: /stock-price       ║
+     ║    • TWELVE_DATA_KEY    → Edge Function: /stock-price       ║
+     ║    • SUPABASE_ANON_KEY  → safe to keep (row-level-security  ║
+     ║                           must be enabled on all tables)    ║
+     ║  The structure of window.CFG is kept intact so the app      ║
+     ║  continues to work without changes during local testing.    ║
      ╚══════════════════════════════════════════════════════════════╝ -->
 <script>
 window.CFG = {
   SUPABASE_URL:'https://bcyyacarlinxuqaztrpf.supabase.co',       // e.g. https://abc.supabase.co
   SUPABASE_ANON_KEY:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjeXlhY2FybGlueHVxYXp0cnBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MjE4ODAsImV4cCI6MjA4OTI5Nzg4MH0.ktlIdQCkSGdZYTouXpOLmW2D6zYPt3wbzLrKPxUiV-g',  // from Settings → API
+  // ⚠️ PRODUCTION: move the three keys below to Supabase Edge Functions
   FINNHUB_KEY:        'd6s49jpr01qrb5i8ilngd6s49jpr01qrb5i8ilo0',
   ALPHA_VANTAGE_KEY:  'AHUXAW7EYLG96JIZ',
   TWELVE_DATA_KEY:    '1da37bc6e58f46d6b647b81fe077d658',
@@ -33,7 +49,7 @@ window.CFG = {
   --t1:#eeeef8;--t2:rgba(238,238,248,.55);--t3:rgba(238,238,248,.28);
   --blue:#3b82f6;--bgl:rgba(59,130,246,.2);
   --teal:#2dd4bf;--green:#4ade80;--red:#f87171;--amber:#fbbf24;--purple:#a78bfa;
-  --r6:6px;--r10:10px;--r16:16px;--r22:22px;
+  --r10:10px;--r16:16px;--r22:22px;           /* --r6 removed: was defined but never referenced */
   --sh:0 8px 32px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.055);
   --tr:.18s cubic-bezier(.4,0,.2,1);
   --sw:240px;
@@ -1479,6 +1495,9 @@ const S = {
   stockRefreshTimer: null,
   stmtBankId: null,
   realtimeChannel: null,
+  // Encrypted cash caches — populated by _loadCashAsync() after vault unlock
+  _cashCache: 0,
+  _cashLogCache: [],
 };
 
 // ── THEME ─────────────────────────────────────────────────────────────
@@ -1754,8 +1773,7 @@ $('fab-transfer')?.addEventListener('click',()=>{
     </div>
     <p id="tr-err" style="color:var(--red);font-size:.78rem;min-height:1rem"></p>`;
   $('mov').classList.remove('dn');
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const fromId=$('tr-from').value;
     const toId=$('tr-to').value;
     const amt=parseFloat($('tr-amt').value)||0;
@@ -1768,18 +1786,17 @@ $('fab-transfer')?.addEventListener('click',()=>{
     if(fromId.startsWith('bank_')){
       const bid=fromId.replace('bank_',''), idx=S.data.banks.findIndex(b=>b.id==bid);
       if(idx!==-1){ S.data.banks[idx].balance=Math.max(0,(+S.data.banks[idx].balance||0)-amt); if(sb) await sb.from('bank_accounts').update({balance:S.data.banks[idx].balance}).eq('id',S.data.banks[idx].id); }
-    } else if(fromId==='cash'){ setCash(Math.max(0,getCash()-amt)); }
+    } else if(fromId==='cash'){ await setCash(Math.max(0,getCash()-amt)); }
     else if(fromId.startsWith('crypto_')){
       const cid=fromId.replace('crypto_',''), idx=S.data.crypto.findIndex(c=>c.id==cid);
       if(idx!==-1){ S.data.crypto[idx].value_lkr=Math.max(0,(+S.data.crypto[idx].value_lkr||0)-amt); if(sb) await sb.from('crypto_wallets').update({value_lkr:S.data.crypto[idx].value_lkr}).eq('id',S.data.crypto[idx].id); }
     }
     // Credit destination
     await creditDest(toId, amt);
-    $('msave').onclick=origSave;
     closeModal();
     renderAll();
     toast(`Transferred ${fmt(amt)} successfully!`,'s');
-  };
+  });
 });
 
 // ── SIGN UP ───────────────────────────────────────────────────────────
@@ -2044,20 +2061,24 @@ async function encryptField(plainText){
 }
 
 async function decryptField(cipherText){
-  if(!_vaultKey || cipherText == null) return cipherText;
+  // Null / undefined → safe placeholder (never expose raw ciphertext)
+  if(cipherText == null) return '[Locked/Error]';
   const str = String(cipherText);
-  if(!str.startsWith(ENC_PREFIX)) return str; // plaintext — pass through
+  // Genuine legacy plaintext (written before encryption was enabled) — pass through
+  if(!str.startsWith(ENC_PREFIX)) return str;
+  // Field IS encrypted but vault key is not loaded → show placeholder instead of leaking blob
+  if(!_vaultKey) return '[Locked/Error]';
   try{
     const raw = str.slice(ENC_PREFIX.length);
     const sep = raw.indexOf(':');
-    if(sep < 0) return str;
+    if(sep < 0) return '[Locked/Error]';
     const iv  = Uint8Array.from(atob(raw.slice(0, sep)), c=>c.charCodeAt(0));
     const ct  = Uint8Array.from(atob(raw.slice(sep+1)),  c=>c.charCodeAt(0));
     const pt  = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, _vaultKey, ct);
     return new TextDecoder().decode(pt);
   }catch{
-    // Wrong key or corrupted data — show lock icon instead of raw ciphertext
-    return '🔒 Locked';
+    // Wrong key or corrupted data — never expose raw ciphertext
+    return '[Locked/Error]';
   }
 }
 
@@ -2541,6 +2562,8 @@ async function finaliseUnlock(key, isCreate){
   S.data.income   = await decryptTable('income',          S.data.income);
   S.data.crypto   = await decryptTable('crypto_wallets',  S.data.crypto);
   S.data.assets   = await decryptTable('physical_assets', S.data.assets);
+  // Re-decrypt cash balance + log now that the vault key is available
+  await _loadCashAsync();
   hideVaultOverlay();
   renderAll();
 
@@ -2987,7 +3010,8 @@ function launch(){
     const e=$('lu-'+k); if(e) e.textContent=localStorage.getItem('fv_lu_'+k+'_'+S.user.id)?'Updated: '+localStorage.getItem('fv_lu_'+k+'_'+S.user.id):'—';
   });
   const ld=$('lu-dash'); if(ld) ld.textContent=localStorage.getItem('fv_lu_global_'+S.user.id)?'Updated: '+localStorage.getItem('fv_lu_global_'+S.user.id):'—';
-  renderAll();
+  // Decrypt cash balance + log from localStorage before first render
+  _loadCashAsync().then(()=>{ renderAll(); });
   if(SB_READY){
     S.stockRefreshTimer=setInterval(refreshStockPrices,CFG.REFRESH_MS);
     refreshStockPrices();
@@ -3396,39 +3420,60 @@ function renderBanks(){
   const banks=S.data.banks;
   const tot=banks.reduce((s,b)=>s+(+b.balance||0),0);
   setText('b-tot',fmt(tot));
-  $('banks-list').innerHTML=banks.length?banks.map(b=>{
-    const inc=S.data.income.filter(i=>String(i.account_id)===String(b.id)).reduce((s,i)=>s+(+i.amount||0),0);
-    const exp=S.data.expenses.filter(e=>(e.paid_from||'').toLowerCase().includes((b.account_name||'').toLowerCase())).reduce((s,e)=>s+(+e.amount||0),0);
-    // Format account number: show last 4 digits, mask the rest
-    const acctNum=b.account_number||'';
-    const acctDisplay=acctNum.length>4
-      ? '•••• '+acctNum.slice(-4)
-      : acctNum;
-    return `<div class="gc itm">
-      <div class="ih">
-        <div><div class="inm">${esc(b.account_name)}</div><div class="isub">${esc(b.bank_name)}</div></div>
-        <span class="bdg">${esc(b.currency||'LKR')}</span>
-      </div>
-      <div class="iamt">${fmt(+b.balance)}</div>
-      ${acctNum?`<div style="display:flex;align-items:center;gap:.5rem;font-size:.76rem;color:var(--t2);font-family:monospace;letter-spacing:.06em">
-        <span>🏦</span>
-        <span id="acct-num-${b.id}">${esc(acctDisplay)}</span>
-        <button onclick="toggleAcctNum('${b.id}','${esc(acctNum)}')"
-          style="font-size:.68rem;color:var(--blue);background:none;border:none;cursor:pointer;padding:.1rem .3rem;border-radius:4px;transition:background var(--tr)"
-          title="Show/hide full number">👁</button>
-        <button onclick="copyText('${esc(acctNum)}','Account number copied!')"
-          style="font-size:.68rem;color:var(--t2);background:none;border:none;cursor:pointer;padding:.1rem .3rem;border-radius:4px;transition:background var(--tr)"
-          title="Copy account number">📋</button>
-      </div>`:''}
-      <div style="display:flex;gap:1rem;font-size:.78rem">
-        <span class="pos">↑ Income: ${fmt(inc)}</span>
-        <span class="neg">↓ Expenses: ${fmt(exp)}</span>
-      </div>
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <button class="btn bg" style="font-size:.78rem;padding:.38rem .8rem" onclick="showStatement('${b.id}')">📋 View Statement</button>
-        <button class="bdel" onclick="rmItem('banks','${b.id}')">Delete</button>
-      </div>
-    </div>`;}).join(''):'<div class="emp">No bank accounts yet. Click "+ Add Account".</div>';
+
+  // Build HTML into a DocumentFragment to prevent UI flickering during re-renders
+  const frag=document.createDocumentFragment();
+  const wrapper=document.createElement('div');
+  wrapper.style.cssText='display:contents'; // transparent wrapper
+
+  if(!banks.length){
+    wrapper.innerHTML='<div class="emp">No bank accounts yet. Click "+ Add Account".</div>';
+  } else {
+    wrapper.innerHTML=banks.map(b=>{
+      // ── ID-based income: income table already stores account_id (UUID)
+      const inc=S.data.income.filter(i=>String(i.account_id)===String(b.id)).reduce((s,i)=>s+(+i.amount||0),0);
+      // ── ID-based expenses: use unified_ledger.source_id ('bank_<uuid>') — survives account renames
+      // Falls back to 0 for expenses logged before the ledger was set up (no data loss).
+      const expLedgerId='bank_'+b.id;
+      const exp=S.data.ledger.filter(r=>r.type==='expense'&&r.source_id===expLedgerId).reduce((s,r)=>s+(+r.amount||0),0);
+      // Format account number: show last 4 digits, mask the rest
+      const acctNum=b.account_number||'';
+      const acctDisplay=acctNum.length>4
+        ? '•••• '+acctNum.slice(-4)
+        : acctNum;
+      return `<div class="gc itm">
+        <div class="ih">
+          <div><div class="inm">${esc(b.account_name)}</div><div class="isub">${esc(b.bank_name)}</div></div>
+          <span class="bdg">${esc(b.currency||'LKR')}</span>
+        </div>
+        <div class="iamt">${fmt(+b.balance)}</div>
+        ${acctNum?`<div style="display:flex;align-items:center;gap:.5rem;font-size:.76rem;color:var(--t2);font-family:monospace;letter-spacing:.06em">
+          <span>🏦</span>
+          <span id="acct-num-${b.id}">${esc(acctDisplay)}</span>
+          <button onclick="toggleAcctNum('${b.id}','${esc(acctNum)}')"
+            style="font-size:.68rem;color:var(--blue);background:none;border:none;cursor:pointer;padding:.1rem .3rem;border-radius:4px;transition:background var(--tr)"
+            title="Show/hide full number">👁</button>
+          <button onclick="copyText('${esc(acctNum)}','Account number copied!')"
+            style="font-size:.68rem;color:var(--t2);background:none;border:none;cursor:pointer;padding:.1rem .3rem;border-radius:4px;transition:background var(--tr)"
+            title="Copy account number">📋</button>
+        </div>`:''}
+        <div style="display:flex;gap:1rem;font-size:.78rem">
+          <span class="pos">↑ Income: ${fmt(inc)}</span>
+          <span class="neg">↓ Expenses: ${fmt(exp)}</span>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn bg" style="font-size:.78rem;padding:.38rem .8rem" onclick="showStatement('${b.id}')">📋 View Statement</button>
+          <button class="bdel" onclick="rmItem('banks','${b.id}')">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Single atomic DOM swap — no incremental innerHTML updates
+  const container=$('banks-list');
+  container.innerHTML='';
+  frag.appendChild(wrapper);
+  container.appendChild(frag);
 }
 
 // ── CARDS ─────────────────────────────────────────────────────────────
@@ -4133,6 +4178,10 @@ function openModal(key){
 
   if(key==='stocks') wireStockModal();
   if(key==='assets') wireAssetEstimator();
+
+  // Register the generic FORMS[] save handler for this modal via the
+  // centralised delegation system — no onclick stacking possible.
+  setMsave(_buildFormSaveHandler());
 }
 
 // Wire stock exchange → autocomplete + price note
@@ -4154,12 +4203,29 @@ function wireStockModal(){
   updateExchangeNote();
 }
 
-function closeModal(){ $('mov').classList.add('dn'); curModal=null; }
+function closeModal(){ $('mov').classList.add('dn'); curModal=null; clearMsave(); }
 $('mclose').addEventListener('click',closeModal);
 $('mcancel').addEventListener('click',closeModal);
 $('mov').addEventListener('click',e=>{ if(e.target===$('mov')) closeModal(); });
 
+// ── CENTRALISED msave DELEGATION ─────────────────────────────────────
+// All modal save actions funnel through ONE click listener.
+// setMsave(fn)  → register the handler for the currently open modal.
+// clearMsave()  → called by closeModal() so stale handlers never fire.
+// This replaces the fragile "const origSave=$('msave').onclick; …" pattern
+// that could cause duplicate transactions when handlers stacked.
+let _msaveHandler = null;
+function setMsave(fn){ _msaveHandler = fn; }
+function clearMsave(){ _msaveHandler = null; }
+
 $('msave').addEventListener('click',async()=>{
+  if(typeof _msaveHandler === 'function') await _msaveHandler();
+});
+
+// ── GENERIC FORM SAVE (all FORMS[] modals opened via openModal()) ──────
+// Registered by openModal() via setMsave() each time a form is opened.
+function _buildFormSaveHandler(){
+  return async function(){
   if(!curModal) return;
   const F=FORMS[curModal];
   const rec={};
@@ -4419,29 +4485,29 @@ $('msave').addEventListener('click',async()=>{
   btn.disabled=false; btn.textContent='Save';
   closeModal();
   renderAll();
-});
+  }; // end _buildFormSaveHandler inner async fn
+} // end _buildFormSaveHandler
 
 // ── CUSTOM CONFIRM DIALOG ─────────────────────────────────────────────
 function confirmModal(msg, onYes){
   setText('mtitle','Confirm');
   $('mbody').innerHTML=`<p style="font-size:.9rem;color:var(--t2);line-height:1.6">${msg}</p>`;
-  // Swap save button to red
+  // Swap save button to red; use setMsave so no stale handlers survive
   const btn=$('msave');
   btn.textContent='Delete'; btn.style.background='var(--red)';
   $('mov').classList.remove('dn');
-  const origSave=btn.onclick;
-  btn.onclick=async()=>{
+  setMsave(async()=>{
     btn.textContent='Save'; btn.style.background='';
-    btn.onclick=origSave;
+    clearMsave();
     closeModal();
     await onYes();
-  };
+  });
   // Reset on cancel too
   const cancelBtn=$('mcancel');
   const origCancel=cancelBtn.onclick;
   cancelBtn.onclick=()=>{
     btn.textContent='Save'; btn.style.background='';
-    btn.onclick=origSave;
+    clearMsave();
     cancelBtn.onclick=origCancel;
     closeModal();
   };
@@ -4700,20 +4766,80 @@ const COINGECKO_IDS={
 };
 
 // ── CASH IN HAND ──────────────────────────────────────────────────────
-function getCash(){ return +localStorage.getItem('fv_cash_'+S.user.id)||0; }
-function getCashLog(){ try{ return JSON.parse(localStorage.getItem('fv_cashlog_'+S.user.id)||'[]'); }catch(_){ return []; } }
-function addCashLog(type,amt,note){ // type: 'in'|'out'
-  const log=getCashLog();
-  log.unshift({type,amt,note,ts:new Date().toISOString()});
-  if(log.length>200) log.length=200; // keep last 200 entries
-  localStorage.setItem('fv_cashlog_'+S.user.id,JSON.stringify(log));
+// Cash balance and log are encrypted in localStorage using the vault key.
+// If the vault key is not available (locked), reads return 0 / [] safely.
+// Raw AES-GCM helpers (mirrors encryptField / decryptField without needing
+// the ENC_PREFIX so the existing balance strings stay compact).
+async function _encryptJson(obj){
+  if(!_vaultKey) return null;
+  try{
+    const enc = new TextEncoder();
+    const iv  = crypto.getRandomValues(new Uint8Array(12));
+    const ct  = await crypto.subtle.encrypt({name:'AES-GCM',iv}, _vaultKey, enc.encode(JSON.stringify(obj)));
+    return btoa(String.fromCharCode(...iv)) + ':' + btoa(String.fromCharCode(...new Uint8Array(ct)));
+  }catch{ return null; }
 }
-function setCash(v){
-  localStorage.setItem('fv_cash_'+S.user.id, v);
+async function _decryptJson(raw){
+  if(!_vaultKey || !raw) return null;
+  try{
+    const sep = raw.indexOf(':');
+    if(sep < 0) return null;
+    const iv = Uint8Array.from(atob(raw.slice(0,sep)),  c=>c.charCodeAt(0));
+    const ct = Uint8Array.from(atob(raw.slice(sep+1)), c=>c.charCodeAt(0));
+    const pt = await crypto.subtle.decrypt({name:'AES-GCM',iv}, _vaultKey, ct);
+    return JSON.parse(new TextDecoder().decode(pt));
+  }catch{ return null; }
+}
+
+function getCash(){
+  // Balance stored as encrypted blob; fall back to plain number for migration
+  const raw = localStorage.getItem('fv_cash_'+S.user.id)||'';
+  // Legacy plaintext (before encryption): just a numeric string
+  if(raw && !raw.includes(':')) return +raw||0;
+  // Encrypted: we can't synchronously decrypt, so we cache the last known value
+  return S._cashCache||0;
+}
+function getCashLog(){
+  // Synchronous read — returns cached value populated by _loadCashAsync()
+  return S._cashLogCache||[];
+}
+// Async loader called after vault unlock and on app launch
+async function _loadCashAsync(){
+  const uid = S.user?.id; if(!uid) return;
+  // Balance
+  const rawBal = localStorage.getItem('fv_cash_'+uid)||'';
+  if(rawBal && !rawBal.includes(':')){ S._cashCache = +rawBal||0; }
+  else if(rawBal){ const v = await _decryptJson(rawBal); S._cashCache = +v||0; }
+  else { S._cashCache = 0; }
+  // Log
+  const rawLog = localStorage.getItem('fv_cashlog_'+uid)||'';
+  if(!rawLog){ S._cashLogCache = []; return; }
+  // Try encrypted first; fall back to legacy plaintext JSON
+  const dec = await _decryptJson(rawLog);
+  if(Array.isArray(dec)){ S._cashLogCache = dec; }
+  else{ try{ S._cashLogCache = JSON.parse(rawLog)||[]; }catch(_){ S._cashLogCache = []; } }
+}
+async function addCashLog(type,amt,note){
+  await _loadCashAsync(); // ensure cache is fresh
+  const log = S._cashLogCache||[];
+  log.unshift({type,amt,note,ts:new Date().toISOString()});
+  if(log.length>200) log.length=200;
+  S._cashLogCache = log;
+  const encrypted = await _encryptJson(log);
+  if(encrypted) localStorage.setItem('fv_cashlog_'+S.user.id, encrypted);
+  else localStorage.setItem('fv_cashlog_'+S.user.id, JSON.stringify(log)); // vault locked: store plaintext temporarily
+}
+async function setCash(v){
+  S._cashCache = +v||0;
+  const encrypted = await _encryptJson(v);
+  if(encrypted) localStorage.setItem('fv_cash_'+S.user.id, encrypted);
+  else localStorage.setItem('fv_cash_'+S.user.id, String(+v||0)); // vault locked: store plaintext temporarily
   const d3=$('cash-page-bal'); if(d3) d3.textContent=fmt(v);
 }
 
-window.showCashStatement=function(){
+window.showCashStatement=async function(){
+  // Ensure cache is fresh (especially important if vault was just unlocked)
+  await _loadCashAsync();
   const cur=getCash();
   const log=getCashLog();
   const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -4738,11 +4864,10 @@ window.showCashStatement=function(){
     </div>
     <div style="max-height:340px;overflow-y:auto">${rows}</div>`;
 
-  // Hide save button, just show close
+  // Hide Save button for this read-only view; restore on close
   $('msave').style.display='none';
+  clearMsave(); // no save action needed
   $('mov').classList.remove('dn');
-  // Restore save button when closed
-  const origClose=$('mclose').onclick;
   $('mclose').onclick=()=>{ $('msave').style.display=''; closeModal(); };
   $('mcancel').onclick=()=>{ $('msave').style.display=''; closeModal(); };
 };
@@ -4777,16 +4902,14 @@ function openTransferModal({title, amount, fromLabel, onConfirm}){
     ${fromLabel?`<p style="font-size:.8rem;color:var(--t2);margin-top:.3rem">From: ${esc(fromLabel)}</p>`:''}`;
   $('mov').classList.remove('dn');
 
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const dest=$('tf-dest').value;
     const amt=parseFloat($('tf-amount').value)||0;
     if(amt<=0){ toast('Enter a valid amount.','e'); return; }
     await onConfirm(dest, amt);
-    $('msave').onclick=origSave;
     closeModal();
     renderAll();
-  };
+  });
 }
 
 // Credit a destination with an amount
@@ -4800,8 +4923,8 @@ async function creditDest(dest, amt, note){
       toast(`+${fmt(amt)} added to ${S.data.banks[idx].account_name}`,'s');
     }
   } else if(dest==='cash'){
-    setCash(getCash()+amt);
-    addCashLog('in',amt,note||`+${fmt(amt)} received`);
+    await setCash(getCash()+amt);
+    await addCashLog('in',amt,note||`+${fmt(amt)} received`);
     toast(`+${fmt(amt)} added to Cash in Hand`,'s');
   }
 }
@@ -4821,8 +4944,7 @@ window.editCard=function(cardId){
       <input type="number" id="ec-limit" value="${+card.credit_limit||0}" min="0"/></div>`;
   $('mov').classList.remove('dn');
   setTimeout(()=>$('ec-outstanding')?.focus(),40);
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const newOut=parseFloat($('ec-outstanding').value)||0;
     const newDue=$('ec-due').value;
     const newLim=parseFloat($('ec-limit').value)||0;
@@ -4835,10 +4957,9 @@ window.editCard=function(cardId){
       if(sb) await sb.from('cards').update({outstanding:newOut,due_date:newDue,credit_limit:newLim}).eq('id',cardId);
     }
     toast('Card updated!','s');
-    $('msave').onclick=origSave;
     closeModal();
     renderAll();
-  };
+  });
 };
 
 // ── PAY CARD ──────────────────────────────────────────────────────────
@@ -4877,8 +4998,7 @@ window.payCard=function(cardId){
 
   $('mov').classList.remove('dn');
 
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const amt=parseFloat($('pay-amount').value)||0;
     const srcId=$('pay-src').value;
     const src=sources.find(s=>s.id===srcId);
@@ -4898,8 +5018,8 @@ window.payCard=function(cardId){
         if(sb) await sb.from('bank_accounts').update({balance:S.data.banks[idx].balance}).eq('id',S.data.banks[idx].id);
       }
     } else if(srcId==='cash'){
-      setCash(Math.max(0,getCash()-amt));
-      addCashLog('out',amt,'Card Payment — '+card.card_name);
+      await setCash(Math.max(0,getCash()-amt));
+      await addCashLog('out',amt,'Card Payment — '+card.card_name);
     } else if(srcId.startsWith('crypto_')){
       const cid=srcId.replace('crypto_',''), idx=S.data.crypto.findIndex(c=>c.id==cid);
       if(idx!==-1){ S.data.crypto[idx].value_lkr=Math.max(0,(+S.data.crypto[idx].value_lkr||0)-amt); if(sb) await sb.from('crypto_wallets').update({value_lkr:S.data.crypto[idx].value_lkr}).eq('id',S.data.crypto[idx].id); }
@@ -4920,10 +5040,9 @@ window.payCard=function(cardId){
     S.data.expenses=[{...expRec,id:genId()},...S.data.expenses];
 
     toast(`Paid ${fmt(amt)} to ${card.card_name}`,'s');
-    $('msave').onclick=origSave;
     closeModal();
     renderAll();
-  };
+  });
 };
 
 // ── TRANSFER FROM STOCK ───────────────────────────────────────────────
@@ -5112,8 +5231,7 @@ window.sellCrypto=function(cryptoId){
     <p id="cs-err" style="color:var(--red);font-size:.78rem;min-height:1rem"></p>`;
 
   $('mov').classList.remove('dn');
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const dest=$('cs-dest').value;
     const amt=parseFloat($('cs-amt').value)||0;
     const action=$('cs-action').value;
@@ -5128,7 +5246,7 @@ window.sellCrypto=function(cryptoId){
       const {data}=await dbInsert('income',{...rec}); S.data.income=[data||{...rec,id:genId()},...S.data.income];
       await writeLedger('income',amt,'CRYPTO',bid,'Crypto Sale',autoNote,today());
     } else if(dest==='cash'){
-      addCashLog('in',amt,autoNote);
+      await addCashLog('in',amt,autoNote);
       await writeLedger('income',amt,'CRYPTO','CASH','Crypto Sale',autoNote,today());
     }
 
@@ -5146,9 +5264,8 @@ window.sellCrypto=function(cryptoId){
       }
       toast(`Partial sale: ${fmt(amt)} transferred.`,'s');
     }
-    $('msave').onclick=origSave;
     closeModal(); renderAll();
-  };
+  });
 };
 
 // ── BUTTON → MODAL WIRING ─────────────────────────────────────────────
@@ -5352,8 +5469,7 @@ window.payLoan=function(loanId){
     </div>
     <p id="lp-err" style="color:var(--red);font-size:.78rem;min-height:1rem"></p>`;
   $('mov').classList.remove('dn');
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const amt=parseFloat($('lp-amt').value)||0;
     const srcId=$('lp-src').value;
     const src=sources.find(s=>s.id===srcId);
@@ -5366,7 +5482,7 @@ window.payLoan=function(loanId){
     if(src&&srcId.startsWith('bank_')){
       const bid=srcId.replace('bank_',''), idx=S.data.banks.findIndex(b=>b.id==bid);
       if(idx!==-1){ S.data.banks[idx].balance=Math.max(0,(+S.data.banks[idx].balance||0)-amt); if(sb) await sb.from('bank_accounts').update({balance:S.data.banks[idx].balance}).eq('id',S.data.banks[idx].id); }
-    } else if(srcId==='cash'){ setCash(Math.max(0,getCash()-amt)); addCashLog('out',amt,'Loan Payment — '+loan.loan_name); }
+    } else if(srcId==='cash'){ await setCash(Math.max(0,getCash()-amt)); await addCashLog('out',amt,'Loan Payment — '+loan.loan_name); }
     // Update loan remaining balance
     const newRem=Math.max(0,rem-amt);
     // Advance next_payment_date by 1 month
@@ -5388,9 +5504,8 @@ window.payLoan=function(loanId){
     await writeLedger('expense',amt,srcId,loanId,'Loan Repayment','Loan Payment — '+loan.loan_name,dt);
     toast(`Paid ${fmt(amt)} towards ${loan.loan_name}`,'s');
     if(newRem===0) toast('🎉 Loan fully repaid!','s');
-    $('msave').onclick=origSave;
     closeModal(); renderAll();
-  };
+  });
 };
 
 window.editLoan=function(loanId){
@@ -5409,8 +5524,7 @@ window.editLoan=function(loanId){
     <div class="mfg"><label>End Date</label>
       <input type="date" id="el-end" value="${loan.end_date||''}"/></div>`;
   $('mov').classList.remove('dn');
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const rem=parseFloat($('el-rem').value)||0;
     const mp=parseFloat($('el-mp').value)||0;
     const rate=parseFloat($('el-rate').value)||0;
@@ -5426,9 +5540,8 @@ window.editLoan=function(loanId){
       if(sb) await sb.from('loans').update({remaining_balance:rem,monthly_payment:mp,interest_rate:rate,next_payment_date:npd,end_date:end}).eq('id',loanId);
     }
     toast('Loan updated!','s');
-    $('msave').onclick=origSave;
     closeModal(); renderAll();
-  };
+  });
 };
 
 // ════════════════════════════════════════════════════════
@@ -5437,6 +5550,7 @@ window.editLoan=function(loanId){
 window.clearCashLog=function(){
   if(!confirm('Clear all cash transaction history? This cannot be undone.')) return;
   localStorage.removeItem('fv_cashlog_'+S.user.id);
+  S._cashLogCache = []; // reset in-memory cache immediately
   renderCashPage();
   toast('Cash history cleared.','i');
 };
@@ -5528,8 +5642,7 @@ $('cash-add-in-btn')?.addEventListener('click',()=>{
       <input type="text" id="cash-in-note" placeholder="e.g. ATM withdrawal"/></div>
     <p id="cash-in-err" style="color:var(--red);font-size:.78rem;min-height:1rem"></p>`;
   $('mov').classList.remove('dn');
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const amt=parseFloat($('cash-in-amt').value)||0;
     const srcId=$('cash-in-src').value;
     const note=$('cash-in-note').value.trim()||'Cash added';
@@ -5546,12 +5659,11 @@ $('cash-add-in-btn')?.addEventListener('click',()=>{
       // Log as a transfer in the ledger — not income
       await writeLedger('transfer',amt,'bank_'+src.ref?.id,'CASH','Cash Withdrawal','Cash added from '+src.label,today());
     }
-    setCash(getCash()+amt);
-    addCashLog('in',amt,note+(src&&src.type!=='other'?' (from '+src.label+')':''));
-    $('msave').onclick=origSave;
+    await setCash(getCash()+amt);
+    await addCashLog('in',amt,note+(src&&src.type!=='other'?' (from '+src.label+')':''));
     closeModal(); renderAll();
     toast(`+${fmt(amt)} added to cash.`,'s');
-  };
+  });
 });
 
 $('cash-add-out-btn')?.addEventListener('click',()=>{
@@ -5571,8 +5683,7 @@ $('cash-add-out-btn')?.addEventListener('click',()=>{
       <input type="text" id="cash-out-note" placeholder="What was this for?"/></div>
     <p id="cash-out-err" style="color:var(--red);font-size:.78rem;min-height:1rem"></p>`;
   $('mov').classList.remove('dn');
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const amt=parseFloat($('cash-out-amt').value)||0;
     const cat=$('cash-out-cat').value;
     const note=$('cash-out-note').value.trim()||cat;
@@ -5580,16 +5691,15 @@ $('cash-add-out-btn')?.addEventListener('click',()=>{
     const cur=getCash();
     if(amt<=0){ $('cash-out-err').textContent='Enter a valid amount.'; return; }
     if(amt>cur){ $('cash-out-err').textContent=`Only ${fmt(cur)} in cash.`; return; }
-    setCash(Math.max(0,cur-amt));
-    addCashLog('out',amt,note);
+    await setCash(Math.max(0,cur-amt));
+    await addCashLog('out',amt,note);
     // Also log as expense
     const expRec={date:today(),category:cat,description:note,paid_from:'Cash in Hand',amount:amt};
     await dbInsert('expenses',{...expRec});
     S.data.expenses=[{...expRec,id:genId()},...S.data.expenses];
-    $('msave').onclick=origSave;
     closeModal(); renderAll();
     toast(`${fmt(amt)} logged as cash outflow.`,'i');
-  };
+  });
 });
 
 // ════════════════════════════════════════════════════════
@@ -5722,7 +5832,11 @@ function openAccountSettings(){
     const el = document.getElementById('acct-devices-list');
     if(!el) return;
 
-    el.innerHTML = '<p style="font-size:.8rem;color:var(--t2)">Loading…</p>';
+    // Show loading state into a temporary node — not directly into el — to avoid flicker
+    const loadNode = document.createElement('p');
+    loadNode.style.cssText='font-size:.8rem;color:var(--t2)';
+    loadNode.textContent='Loading…';
+    el.replaceChildren(loadNode);
 
     let devs = [], loadErr = null;
     try{
@@ -5741,20 +5855,33 @@ function openAccountSettings(){
 
     _devicesCache = devs;
 
+    // Build the final DOM in a DocumentFragment — swap in one atomic operation
+    const frag = document.createDocumentFragment();
+
     if(loadErr){
       const isTableMissing = loadErr.code === '42P01' || loadErr.message?.includes('does not exist');
-      el.innerHTML = isTableMissing
-        ? '<p style="font-size:.8rem;color:var(--amber)">⚠️ Table not set up yet. Run the <strong>registered_devices</strong> DDL from the schema section in Supabase SQL Editor.</p>'
-        : `<p style="font-size:.8rem;color:var(--red)">Error loading devices: ${esc(loadErr.message||'Unknown error')}</p>`;
+      const p = document.createElement('p');
+      p.style.cssText = `font-size:.8rem;color:var(--${isTableMissing?'amber':'red'})`;
+      p.innerHTML = isTableMissing
+        ? '⚠️ Table not set up yet. Run the <strong>registered_devices</strong> DDL from the schema section in Supabase SQL Editor.'
+        : `Error loading devices: ${esc(loadErr.message||'Unknown error')}`;
+      frag.appendChild(p);
+      el.replaceChildren(frag);
       return;
     }
 
     if(!devs.length){
-      el.innerHTML = '<p style="font-size:.8rem;color:var(--t2)">No registered devices found.</p>';
+      const p = document.createElement('p');
+      p.style.cssText='font-size:.8rem;color:var(--t2)';
+      p.textContent='No registered devices found.';
+      frag.appendChild(p);
+      el.replaceChildren(frag);
       return;
     }
 
-    el.innerHTML = devs.map(d=>`
+    // Render each device row into the fragment — zero flickering on refresh
+    const tmp = document.createElement('div');
+    tmp.innerHTML = devs.map(d=>`
       <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem .8rem;border-radius:var(--r10);background:var(--gl);border:1.5px solid var(--bd);margin-bottom:.45rem;gap:.5rem">
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:.875rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
@@ -5770,6 +5897,8 @@ function openAccountSettings(){
           ? `<button class="bdel" style="flex-shrink:0" data-devid="${esc(d.device_id)}" data-devname="${esc(d.device_name||'device')}" onclick="removeDeviceClick(this)">Remove</button>`
           : ''}
       </div>`).join('');
+    while(tmp.firstChild) frag.appendChild(tmp.firstChild);
+    el.replaceChildren(frag);
   }
 
   $('mbody').innerHTML=`
@@ -5845,10 +5974,8 @@ function openAccountSettings(){
 
 
   $('mov').classList.remove('dn');
-  const origSave=$('msave').onclick;
-  const origSaveLabel=$('msave').textContent;
   $('msave').textContent='Save Changes';
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const newName=$('acct-name').value.trim();
     const pw=$('acct-pw').value;
     const pw2=$('acct-pw2').value;
@@ -5873,12 +6000,12 @@ function openAccountSettings(){
           $('uav').textContent=ini;
           const uavD=$('uav-d'); if(uavD) uavD.textContent=ini;
         }
-        setTimeout(()=>{ $('msave').textContent=origSaveLabel; $('msave').onclick=origSave; $('msave').disabled=false; closeModal(); },1500);
+        setTimeout(()=>{ $('msave').textContent='Save'; clearMsave(); $('msave').disabled=false; closeModal(); },1500);
         return;
       }
     }catch(e){ msgEl.textContent='Error: '+e.message;msgEl.style.color='var(--red)'; }
     $('msave').disabled=false; $('msave').textContent='Save Changes';
-  };
+  });
 
   // ── Delete account button — nuclear RPC version ──────────────────────
   setTimeout(()=>{
@@ -6041,8 +6168,7 @@ function openQuickAdd(){
   $('qa-cat')?.addEventListener('change',updateAutoDesc);
   refreshCategories(); // initialise
 
-  const origSave=$('msave').onclick;
-  $('msave').onclick=async()=>{
+  setMsave(async()=>{
     const type=document.querySelector('input[name="qa-type"]:checked')?.value||'income';
     const dt=$('qa-date').value||today();
     const cat=$('qa-cat')?.value||'';
@@ -6069,14 +6195,14 @@ function openQuickAdd(){
           if(idx!==-1){ S.data.banks[idx].balance=(+S.data.banks[idx].balance||0)+amt; if(sb) await sb.from('bank_accounts').update({balance:S.data.banks[idx].balance}).eq('id',S.data.banks[idx].id); }
           const rec={date:dt,account_id:srcId.replace('bank_',''),source:cat||'Income',description:autoDesc,amount:amt};
           const {data}=await dbInsert('income',{...rec}); S.data.income=[data||{...rec,id:genId()},...S.data.income];
-        } else if(srcId==='cash'){ setCash(getCash()+amt); addCashLog('in',amt,autoDesc); }
+        } else if(srcId==='cash'){ await setCash(getCash()+amt); await addCashLog('in',amt,autoDesc); }
         await writeLedger('income',amt,null,srcId.startsWith('bank_')?srcId.replace('bank_',''):null,cat||'Income',autoDesc,dt);
         toast(`+${fmt(amt)} income recorded.`,'s');
       } else if(type==='expense'){
         if(srcId.startsWith('bank_')){
           const bid=srcId.replace('bank_',''), idx=S.data.banks.findIndex(b=>b.id==bid);
           if(idx!==-1){ S.data.banks[idx].balance=Math.max(0,(+S.data.banks[idx].balance||0)-amt); if(sb) await sb.from('bank_accounts').update({balance:S.data.banks[idx].balance}).eq('id',S.data.banks[idx].id); }
-        } else if(srcId==='cash'){ setCash(Math.max(0,getCash()-amt)); addCashLog('out',amt,autoDesc); }
+        } else if(srcId==='cash'){ await setCash(Math.max(0,getCash()-amt)); await addCashLog('out',amt,autoDesc); }
         else if(srcId.startsWith('crypto_')){
           const cid=srcId.replace('crypto_',''), idx=S.data.crypto.findIndex(c=>c.id==cid);
           if(idx!==-1){ S.data.crypto[idx].value_lkr=Math.max(0,(+S.data.crypto[idx].value_lkr||0)-amt); if(sb) await sb.from('crypto_wallets').update({value_lkr:S.data.crypto[idx].value_lkr}).eq('id',S.data.crypto[idx].id); }
@@ -6090,7 +6216,7 @@ function openQuickAdd(){
         if(srcId.startsWith('bank_')){
           const bid=srcId.replace('bank_',''), idx=S.data.banks.findIndex(b=>b.id==bid);
           if(idx!==-1){ S.data.banks[idx].balance=Math.max(0,(+S.data.banks[idx].balance||0)-amt); if(sb) await sb.from('bank_accounts').update({balance:S.data.banks[idx].balance}).eq('id',S.data.banks[idx].id); }
-        } else if(srcId==='cash'){ setCash(Math.max(0,getCash()-amt)); addCashLog('out',amt,'Transfer: '+autoDesc); }
+        } else if(srcId==='cash'){ await setCash(Math.max(0,getCash()-amt)); await addCashLog('out',amt,'Transfer: '+autoDesc); }
         else if(srcId.startsWith('crypto_')){
           const cid=srcId.replace('crypto_',''), idx=S.data.crypto.findIndex(c=>c.id==cid);
           if(idx!==-1){ S.data.crypto[idx].value_lkr=Math.max(0,(+S.data.crypto[idx].value_lkr||0)-amt); if(sb) await sb.from('crypto_wallets').update({value_lkr:S.data.crypto[idx].value_lkr}).eq('id',S.data.crypto[idx].id); }
@@ -6104,9 +6230,8 @@ function openQuickAdd(){
     } catch(e){ $('qa-err').textContent='Error: '+e.message; $('msave').disabled=false; $('msave').textContent='Save'; return; }
 
     $('msave').disabled=false; $('msave').textContent='Save';
-    $('msave').onclick=origSave;
     closeModal(); renderAll();
-  };
+  });
 }
 
 $('tb-qadd')?.addEventListener('click', openQuickAdd);
