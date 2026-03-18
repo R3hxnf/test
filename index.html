@@ -769,6 +769,14 @@ img{max-width:100%}
 /* ══════════════════════════════════════════════════════
    AUTH — Mobile login card
 ══════════════════════════════════════════════════════ */
+
+/* ════════════════════ OTP MODAL ════════════════════ */
+#otp-modal-ov .fg input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--bgl)}
+#otp-modal-ov button.btn{transition:all var(--tr)}
+
+/* ════════════════════ DEVICE LIST ══════════════════ */
+#acct-devices-list .bdel{font-size:.72rem;flex-shrink:0}
+
 @media(max-width:480px){
   #auth-ov{align-items:flex-end;padding:0}
   .acard{
@@ -1285,7 +1293,103 @@ img{max-width:100%}
   </div>
 </div>
 
-<!-- STATEMENT PANEL -->
+<!-- ══════════ VAULT UNLOCK OVERLAY (shown after auth if Master Key not in localStorage) ══════════ -->
+<div id="vault-ov" class="dn" style="
+  position:fixed;inset:0;z-index:99998;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  padding:1.2rem;animation:sIn .25s ease both">
+  <div style="
+    width:100%;max-width:390px;
+    background:var(--gl);backdrop-filter:blur(40px) saturate(180%);
+    border:1.5px solid var(--bd2);border-radius:var(--r22);
+    box-shadow:0 28px 72px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.07);
+    padding:2.2rem 2rem 1.8rem;animation:sup .3s cubic-bezier(.4,0,.2,1) both;
+    text-align:center">
+
+    <!-- Icon -->
+    <div id="vault-icon" style="width:60px;height:60px;border-radius:50%;
+      background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(167,139,250,.2));
+      border:1.5px solid rgba(59,130,246,.3);
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.6rem;margin:0 auto 1.1rem">🔐</div>
+
+    <h2 id="vault-title" style="font-size:1.2rem;font-weight:700;margin-bottom:.3rem;letter-spacing:-.03em">Vault Locked</h2>
+    <p id="vault-subtitle" style="font-size:.82rem;color:var(--t2);margin-bottom:1.3rem;line-height:1.5">
+      Unlock to access your encrypted financial data.
+    </p>
+
+    <!-- Passkey button — shown when passkey is registered -->
+    <div id="vault-passkey-section" class="dn" style="margin-bottom:1rem">
+      <button id="vault-passkey-btn" class="btn bp bfull" style="height:52px;font-size:.95rem;font-weight:700;
+        background:linear-gradient(135deg,#1a1a2e,#16213e);border:1.5px solid rgba(99,102,241,.5);
+        display:flex;align-items:center;justify-content:center;gap:.65rem">
+        <span style="font-size:1.3rem">🪪</span>
+        <span>Unlock with Passkey</span>
+      </button>
+      <p style="font-size:.72rem;color:var(--t3);margin:.55rem 0 .8rem">
+        Uses your device biometric or screen lock
+      </p>
+      <div style="display:flex;align-items:center;gap:.6rem;color:var(--t3);font-size:.72rem;margin-bottom:.9rem">
+        <div style="flex:1;height:1px;background:var(--bd)"></div>or use PIN<div style="flex:1;height:1px;background:var(--bd)"></div>
+      </div>
+    </div>
+
+    <!-- PIN section -->
+    <div id="vault-pin-section">
+      <div class="fg" style="text-align:left;margin-bottom:.75rem">
+        <label id="vault-pin-lbl">Device Master Key</label>
+        <input id="vault-pin" type="password" placeholder="Enter PIN"
+          autocomplete="off" inputmode="numeric"
+          style="height:52px;font-size:1.3rem;letter-spacing:.35em;text-align:center;font-family:monospace"/>
+      </div>
+      <div id="vault-confirm-wrap" class="fg dn" style="text-align:left;margin-bottom:.75rem">
+        <label>Confirm PIN</label>
+        <input id="vault-pin2" type="password" placeholder="Repeat PIN"
+          autocomplete="off" inputmode="numeric"
+          style="height:52px;font-size:1.3rem;letter-spacing:.35em;text-align:center;font-family:monospace"/>
+      </div>
+      <button id="vault-unlock-btn" class="btn bp bfull" style="height:48px;font-size:.93rem;font-weight:700">
+        🔓 Unlock with Master Key
+      </button>
+    </div>
+
+    <p id="vault-hint" style="font-size:.73rem;color:var(--t3);margin-top:.8rem;line-height:1.55"></p>
+    <p id="vault-msg"  style="font-size:.8rem;font-weight:600;min-height:1.1rem;margin-top:.35rem;color:var(--red)"></p>
+    <button onclick="$('btn-out')?.click()" style="font-size:.72rem;color:var(--t3);background:none;border:none;cursor:pointer;margin-top:.65rem;text-decoration:underline">
+      Sign out instead
+    </button>
+  </div>
+</div>
+
+<!-- ══════════ OTP VERIFICATION MODAL ══════════ -->
+<div id="otp-modal-ov" class="dn" style="
+  position:fixed;inset:0;z-index:999999;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  padding:1.2rem">
+  <div style="
+    width:100%;max-width:380px;
+    background:var(--gl);backdrop-filter:blur(40px) saturate(180%);
+    border:1.5px solid var(--bd2);border-radius:var(--r22);
+    box-shadow:0 28px 72px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.07);
+    padding:2rem 1.8rem 1.6rem;text-align:center">
+    <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,rgba(59,130,246,.22),rgba(167,139,250,.18));border:1.5px solid rgba(59,130,246,.35);display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin:0 auto .9rem">📧</div>
+    <h2 id="otp-modal-title" style="font-size:1.1rem;font-weight:700;margin-bottom:.3rem;letter-spacing:-.03em">Verify Your Email</h2>
+    <p id="otp-modal-sub" style="font-size:.8rem;color:var(--t2);margin-bottom:1.2rem;line-height:1.5">A 6-digit code has been sent to your email address.</p>
+    <div class="fg" style="text-align:left;margin-bottom:.75rem">
+      <label>One-Time Code</label>
+      <input id="otp-code-input" type="text" inputmode="numeric" maxlength="6"
+        placeholder="• • • • • •" autocomplete="one-time-code"
+        style="height:52px;font-size:1.5rem;letter-spacing:.4em;text-align:center;font-family:monospace"/>
+    </div>
+    <button id="otp-submit-btn" class="btn bp bfull" style="height:44px;font-size:.9rem;font-weight:700;margin-bottom:.6rem">Verify Code</button>
+    <button id="otp-resend-btn" style="font-size:.75rem;color:var(--blue);background:none;border:none;cursor:pointer;text-decoration:underline">Resend code</button>
+    <p id="otp-msg" style="font-size:.8rem;font-weight:600;min-height:1rem;margin-top:.5rem;color:var(--red)"></p>
+    <button id="otp-cancel-btn" style="font-size:.72rem;color:var(--t3);background:none;border:none;cursor:pointer;margin-top:.5rem;text-decoration:underline">Cancel</button>
+  </div>
+</div>
+
 <div class="stmt-panel" id="stmt-panel">
   <div class="stmt-head">
     <div>
@@ -1734,6 +1838,13 @@ $('btn-signup').addEventListener('click', async()=>{
 async function doSignOut(){
   clearInterval(S.stockRefreshTimer);
   if(S.realtimeChannel&&sb) sb.removeChannel(S.realtimeChannel);
+  // Remove this device entry from Supabase before signing out
+  if(sb && S.user){
+    const did = getDeviceId();
+    await sb.from('registered_devices').delete()
+      .eq('user_id', S.user.id).eq('device_id', did).catch(()=>{});
+  }
+  clearVaultKey(); // wipe the encryption key from memory and localStorage
   if(sb) await sb.auth.signOut();
   S.user=null;
   location.reload();
@@ -1774,8 +1885,20 @@ if(sb){
         await sb.auth.updateUser({data:{finova_initialized:true}}).catch(()=>{});
       }
 
+      // Try to restore vault key from localStorage (device-persistent)
+      await loadVaultKeyFromSession();
+
       await loadAll();
       launch();
+
+      // Check device registration — blocks or prompts OTP for new devices
+      const deviceOk = await handleDeviceRegistration();
+      if(!deviceOk) return; // sign-out was triggered inside handleDeviceRegistration
+
+      // Show vault overlay if no key was restored — user must set/enter Master Key
+      if(!_vaultKey){
+        showVaultOverlay();
+      }
     }
 
     if(event==='SIGNED_OUT'){
@@ -1804,12 +1927,744 @@ async function loadAll(){
   ];
   await Promise.all(tbls.map(async({key,tbl})=>{
     const {data,error}=await sb.from(tbl).select('*').eq('user_id',uid).order('created_at',{ascending:false});
-    if(!error) S.data[key]=data||[];
+    if(!error){
+      // Decrypt any encrypted fields if vault key is available
+      S.data[key] = _vaultKey ? await decryptTable(tbl, data||[]) : (data||[]);
+    }
   }));
 }
 
-// ── SUPABASE INSERT ───────────────────────────────────────────────────
-// Allowed columns per table — prevents "column not found in schema cache" errors
+// ══════════════════════════════════════════════════════════════════════
+// ZERO-KNOWLEDGE CLIENT-SIDE ENCRYPTION (AES-GCM via Web Crypto API)
+// ══════════════════════════════════════════════════════════════════════
+//
+// ARCHITECTURE DECISION:
+//   Numeric fields (balance, amount, principal) stay as plaintext numbers
+//   so all .reduce() / dashboard math works without decryption on every render.
+//   SENSITIVE IDENTIFIERS (account names, account numbers, wallet addresses,
+//   descriptions, loan names) are encrypted — these are the fields that would
+//   expose personal financial identity if the DB were leaked.
+//
+//   The Device Master Key + user.id → PBKDF2 → AES-GCM CryptoKey is stored
+//   in localStorage (as a serialised JWK) so it persists across browser
+//   restarts on this registered device. It never hits the network.
+// ══════════════════════════════════════════════════════════════════════
+
+// Tables and their fields that get encrypted
+const CSE_MAP = {
+  bank_accounts: ['account_name','account_number','bank_name'],
+  loans:         ['loan_name','lender','description'],
+  expenses:      ['description'],
+  income:        ['description'],
+  crypto_wallets:['wallet_name','wallet_address'],
+  physical_assets:['asset_name','description'],
+};
+
+// In-memory vault key — set on unlock, cleared on sign-out
+let _vaultKey = null;
+const VAULT_LS_KEY_PREFIX = 'fv_vk_';   // localStorage key prefix for the serialised JWK (per user)
+
+// ── Key Derivation ─────────────────────────────────────────────────────
+async function deriveVaultKey(pin, userId){
+  const enc = new TextEncoder();
+  // Base material: PIN as password
+  const baseKey = await crypto.subtle.importKey(
+    'raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']
+  );
+  // Salt: userId so the same PIN produces different keys for different users
+  const salt = enc.encode(userId);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:100_000, hash:'SHA-256' },
+    baseKey,
+    { name:'AES-GCM', length:256 },
+    true,   // extractable so we can store in sessionStorage
+    ['encrypt','decrypt']
+  );
+}
+
+// Persist key in localStorage (persists across browser restarts on this device)
+async function persistVaultKey(key){
+  const uid = S.user?.id || 'anon';
+  const jwk = await crypto.subtle.exportKey('jwk', key);
+  localStorage.setItem(VAULT_LS_KEY_PREFIX + uid, JSON.stringify(jwk));
+  _vaultKey = key;
+}
+
+async function loadVaultKeyFromSession(){
+  // Now reads from localStorage (device-persistent)
+  const uid = S.user?.id;
+  if(!uid) return null;
+  const raw = localStorage.getItem(VAULT_LS_KEY_PREFIX + uid);
+  if(!raw) return null;
+  try{
+    const jwk = JSON.parse(raw);
+    _vaultKey = await crypto.subtle.importKey(
+      'jwk', jwk, { name:'AES-GCM' }, true, ['encrypt','decrypt']
+    );
+    return _vaultKey;
+  }catch{ return null; }
+}
+
+function clearVaultKey(){
+  _vaultKey = null;
+  const uid = S.user?.id;
+  if(uid) localStorage.removeItem(VAULT_LS_KEY_PREFIX + uid);
+}
+
+// ── AES-GCM Encrypt / Decrypt ─────────────────────────────────────────
+// Ciphertext format stored in DB: "b64iv:b64ciphertext"
+// Prefix "enc:" marks encrypted values so we can detect and skip re-encryption
+const ENC_PREFIX = 'enc:';
+
+async function encryptField(plainText){
+  if(!_vaultKey || plainText == null) return plainText;
+  const str = String(plainText);
+  if(str.startsWith(ENC_PREFIX)) return str; // already encrypted
+  const enc = new TextEncoder();
+  const iv  = crypto.getRandomValues(new Uint8Array(12)); // unique IV per call
+  const ct  = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, _vaultKey, enc.encode(str));
+  const b64iv = btoa(String.fromCharCode(...iv));
+  const b64ct = btoa(String.fromCharCode(...new Uint8Array(ct)));
+  return ENC_PREFIX + b64iv + ':' + b64ct;
+}
+
+async function decryptField(cipherText){
+  if(!_vaultKey || cipherText == null) return cipherText;
+  const str = String(cipherText);
+  if(!str.startsWith(ENC_PREFIX)) return str; // plaintext — pass through
+  try{
+    const raw = str.slice(ENC_PREFIX.length);
+    const sep = raw.indexOf(':');
+    if(sep < 0) return str;
+    const iv  = Uint8Array.from(atob(raw.slice(0, sep)), c=>c.charCodeAt(0));
+    const ct  = Uint8Array.from(atob(raw.slice(sep+1)),  c=>c.charCodeAt(0));
+    const pt  = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, _vaultKey, ct);
+    return new TextDecoder().decode(pt);
+  }catch{
+    // Wrong PIN or corrupted — return a placeholder so the UI doesn't crash
+    return '[encrypted]';
+  }
+}
+
+// ── Encrypt a whole record before DB write ────────────────────────────
+async function encryptRecord(tbl, rec){
+  if(!_vaultKey) return rec;
+  const fields = CSE_MAP[tbl];
+  if(!fields) return rec;
+  const out = {...rec};
+  for(const f of fields){
+    if(out[f] != null) out[f] = await encryptField(out[f]);
+  }
+  return out;
+}
+
+// ── Decrypt a whole record after DB read ──────────────────────────────
+async function decryptRecord(tbl, rec){
+  if(!_vaultKey || !rec) return rec;
+  const fields = CSE_MAP[tbl];
+  if(!fields) return rec;
+  const out = {...rec};
+  for(const f of fields){
+    if(out[f] != null) out[f] = await decryptField(out[f]);
+  }
+  return out;
+}
+
+async function decryptTable(tbl, rows){
+  if(!rows?.length) return rows||[];
+  return Promise.all(rows.map(r=>decryptRecord(tbl,r)));
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+// DEVICE REGISTRATION SYSTEM
+// Max 3 registered devices per user. 1st device: auto-register.
+// 2nd & 3rd device: require Email OTP.  4th device: blocked.
+// ══════════════════════════════════════════════════════════════════════
+
+// Generate a stable device fingerprint stored in localStorage
+function getDeviceId(){
+  const key = 'fv_device_id';
+  let did = localStorage.getItem(key);
+  if(!did){
+    did = 'dev_' + crypto.getRandomValues(new Uint32Array(4)).join('_');
+    localStorage.setItem(key, did);
+  }
+  return did;
+}
+
+// Get a human-readable device name
+function getDeviceName(){
+  const ua = navigator.userAgent;
+  let browser = 'Unknown Browser';
+  if(ua.includes('Edg/'))    browser = 'Edge';
+  else if(ua.includes('OPR') || ua.includes('Opera')) browser = 'Opera';
+  else if(ua.includes('Chrome'))  browser = 'Chrome';
+  else if(ua.includes('Firefox')) browser = 'Firefox';
+  else if(ua.includes('Safari'))  browser = 'Safari';
+
+  let os = 'Unknown OS';
+  if(ua.includes('Windows'))     os = 'Windows';
+  else if(ua.includes('Mac OS'))  os = 'macOS';
+  else if(ua.includes('Linux'))   os = 'Linux';
+  else if(ua.includes('Android')) os = 'Android';
+  else if(/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
+
+  return browser + ' on ' + os;
+}
+
+// Check and register this device. Returns: 'ok', 'otp_required', 'blocked'
+async function checkAndRegisterDevice(){
+  if(!sb || !S.user) return 'ok';
+  const uid  = S.user.id;
+  const did  = getDeviceId();
+  const dname = getDeviceName();
+
+  // Check if this device is already registered and verified
+  const { data: existing } = await sb.from('registered_devices')
+    .select('*').eq('user_id', uid).eq('device_id', did).maybeSingle();
+
+  if(existing){
+    if(existing.is_verified){
+      // Update last_used
+      await sb.from('registered_devices').update({ last_used: new Date().toISOString() })
+        .eq('id', existing.id).catch(()=>{});
+      return 'ok';
+    } else {
+      // Was registered but not yet verified (previous OTP session)
+      return 'otp_required';
+    }
+  }
+
+  // New device — count existing registered + verified devices
+  const { data: allDevices } = await sb.from('registered_devices')
+    .select('id').eq('user_id', uid).eq('is_verified', true);
+  const count = allDevices?.length || 0;
+
+  if(count >= 3){
+    return 'blocked';
+  }
+
+  if(count === 0){
+    // First device — auto-register without OTP
+    await sb.from('registered_devices').insert({
+      device_id: did,
+      user_id:   uid,
+      device_name: dname,
+      last_used: new Date().toISOString(),
+      is_verified: true
+    }).catch(()=>{});
+    return 'ok';
+  }
+
+  // 2nd or 3rd device — insert as unverified, then require OTP
+  await sb.from('registered_devices').upsert({
+    device_id: did,
+    user_id:   uid,
+    device_name: dname,
+    last_used: new Date().toISOString(),
+    is_verified: false
+  }, { onConflict: 'device_id' }).catch(()=>{});
+
+  return 'otp_required';
+}
+
+// Send OTP via Supabase (uses the built-in email OTP flow)
+async function sendDeviceOtp(){
+  if(!sb || !S.user?.email) return false;
+  const { error } = await sb.auth.signInWithOtp({
+    email: S.user.email,
+    options: { shouldCreateUser: false }
+  });
+  return !error;
+}
+
+// Verify OTP token entered by user and mark device as verified
+async function verifyDeviceOtp(token){
+  if(!sb || !S.user?.email) return false;
+  const { data, error } = await sb.auth.verifyOtp({
+    email: S.user.email,
+    token: token,
+    type: 'email'
+  });
+  if(error) return false;
+
+  // Mark device as verified
+  const did = getDeviceId();
+  await sb.from('registered_devices').update({
+    is_verified: true,
+    last_used: new Date().toISOString()
+  }).eq('user_id', S.user.id).eq('device_id', did).catch(()=>{});
+
+  return true;
+}
+
+// Send OTP for device removal verification
+async function sendRemovalOtp(){
+  return sendDeviceOtp();
+}
+
+// Show the OTP modal. Returns a Promise that resolves with true (verified) or false (cancelled).
+function showOtpModal({ title, subtitle, onVerify, onResend }){
+  return new Promise(resolve => {
+    const ov   = document.getElementById('otp-modal-ov');
+    const tEl  = document.getElementById('otp-modal-title');
+    const sEl  = document.getElementById('otp-modal-sub');
+    const inp  = document.getElementById('otp-code-input');
+    const sub  = document.getElementById('otp-submit-btn');
+    const rsnd = document.getElementById('otp-resend-btn');
+    const msg  = document.getElementById('otp-msg');
+    const cncl = document.getElementById('otp-cancel-btn');
+
+    tEl.textContent    = title    || 'Verify Your Email';
+    sEl.innerHTML      = subtitle || 'Enter the 6-digit code sent to your email.';
+    inp.value          = '';
+    msg.textContent    = '';
+    msg.style.color    = 'var(--red)';
+
+    ov.classList.remove('dn');
+    ov.style.display = 'flex';
+    setTimeout(()=>inp.focus(), 80);
+
+    // Clean up helpers
+    function close(result){
+      ov.classList.add('dn');
+      ov.style.display = '';
+      sub.onclick  = null;
+      rsnd.onclick = null;
+      cncl.onclick = null;
+      inp.onkeydown = null;
+      resolve(result);
+    }
+
+    sub.onclick = async () => {
+      const code = inp.value.trim();
+      if(code.length < 6){ msg.textContent = 'Enter the full 6-digit code.'; return; }
+      sub.disabled = true; sub.textContent = 'Verifying…';
+      msg.textContent = '';
+      const ok = await onVerify(code);
+      sub.disabled = false; sub.textContent = 'Verify Code';
+      if(ok){
+        close(true);
+      } else {
+        msg.textContent = '❌ Invalid or expired code. Try again.';
+        inp.value = ''; inp.focus();
+      }
+    };
+
+    rsnd.onclick = async () => {
+      rsnd.textContent = 'Sending…'; rsnd.disabled = true;
+      const ok = await (onResend ? onResend() : sendDeviceOtp());
+      rsnd.disabled = false;
+      rsnd.textContent = ok ? '✅ Sent!' : '❌ Failed';
+      setTimeout(()=>{ rsnd.textContent = 'Resend code'; }, 3000);
+    };
+
+    cncl.onclick = () => close(false);
+
+    inp.onkeydown = e => { if(e.key === 'Enter') sub.click(); };
+  });
+}
+
+// Handle the full device registration flow after login
+async function handleDeviceRegistration(){
+  const status = await checkAndRegisterDevice();
+  if(status === 'ok') return true;
+
+  if(status === 'blocked'){
+    // Show blocking message
+    return new Promise(resolve => {
+      const ov   = document.getElementById('otp-modal-ov');
+      const tEl  = document.getElementById('otp-modal-title');
+      const sEl  = document.getElementById('otp-modal-sub');
+      const sub  = document.getElementById('otp-submit-btn');
+      const rsnd = document.getElementById('otp-resend-btn');
+      const cncl = document.getElementById('otp-cancel-btn');
+      const inp  = document.getElementById('otp-code-input');
+      const msg  = document.getElementById('otp-msg');
+
+      tEl.textContent = '🚫 Device Limit Reached';
+      sEl.innerHTML   = 'You already have <strong>3 registered devices</strong>. Remove an existing device from <strong>Account Settings → Registered Devices</strong> before adding a new one.';
+      inp.style.display = 'none';
+      sub.style.display = 'none';
+      rsnd.style.display = 'none';
+      msg.textContent = '';
+
+      ov.classList.remove('dn');
+      ov.style.display = 'flex';
+
+      cncl.textContent = 'Sign Out';
+      cncl.onclick = () => {
+        inp.style.display = '';
+        sub.style.display = '';
+        rsnd.style.display = '';
+        cncl.textContent = 'Cancel';
+        ov.classList.add('dn');
+        ov.style.display = '';
+        resolve(false);
+        doSignOut();
+      };
+    });
+  }
+
+  // OTP required — send it first
+  const sent = await sendDeviceOtp();
+  const email = S.user?.email || 'your email';
+  const ok = await showOtpModal({
+    title:    '🔐 New Device Registration',
+    subtitle: `A verification code was sent to <strong>${email}</strong>.<br>Enter it below to register this device.`,
+    onVerify: verifyDeviceOtp,
+    onResend: sendDeviceOtp,
+  });
+
+  if(!ok){
+    // User cancelled — sign out so they don't get a partial session
+    await doSignOut();
+    return false;
+  }
+  return true;
+}
+
+// ── Show / Hide Vault Overlay ─────────────────────────────────────────
+function showVaultOverlay(){
+  const ov = $('vault-ov');
+  if(!ov) return;
+
+  const uid = S.user?.id || '';
+  const hasToken    = !!localStorage.getItem('fv_vtok_' + uid);     // PIN token exists
+  const hasPasskey  = !!localStorage.getItem('fv_pk_' + uid) &&
+                      !!localStorage.getItem('fv_vtok_pk_' + uid);  // passkey token exists too
+  const isCreate    = !hasToken && !hasPasskey;
+
+  // Passkey section — show if a credential is registered
+  $('vault-passkey-section').classList.toggle('dn', !hasPasskey);
+
+  // Title / subtitle / labels
+  $('vault-title').textContent = isCreate ? '🔑 Create Vault PIN' : '🔐 Vault Locked';
+  $('vault-subtitle').innerHTML = isCreate
+    ? 'Choose a Master PIN to protect your financial data.<br><span style="font-size:.72rem;color:var(--t3)">Keep it safe — there is no recovery option.</span>'
+    : hasPasskey
+      ? 'Tap your passkey or enter your Master PIN.'
+      : 'Enter your Device Master Key to decrypt your data.<br><span style="font-size:.72rem;color:var(--t3)">This device is registered to your account.</span>';
+  $('vault-pin-lbl').textContent    = isCreate ? 'Choose a Master Key (min 4 chars)' : 'Device Master Key';
+  $('vault-unlock-btn').textContent = isCreate ? '🔐 Set Master Key & Encrypt' : '🔓 Unlock with Master Key';
+  $('vault-confirm-wrap').classList.toggle('dn', !isCreate);
+  $('vault-hint').textContent = isCreate
+    ? '⚠️ Forgotten Device Master Keys cannot be recovered. You can add a passkey after setup.'
+    : !hasPasskey
+      ? '💡 Your Device Master Key is unique to this browser profile. Passkeys add biometric convenience.'
+      : '';
+
+  $('vault-msg').textContent = '';
+  $('vault-pin').value  = '';
+  if($('vault-pin2')) $('vault-pin2').value = '';
+
+  ov.classList.remove('dn');
+  ov.style.display = 'flex';
+  // Auto-trigger passkey if available (best UX)
+  if(hasPasskey && !isCreate){
+    setTimeout(()=>attemptPasskeyUnlock(), 300);
+  } else {
+    setTimeout(()=>$('vault-pin')?.focus(), 80);
+  }
+}
+
+function hideVaultOverlay(){
+  const ov = $('vault-ov');
+  if(ov){ ov.classList.add('dn'); ov.style.display = ''; }
+}
+
+// ── Vault sentinel ────────────────────────────────────────────────────
+const VAULT_SENTINEL = 'finova-vault-ok-v1';
+
+// PIN and passkey use SEPARATE verification tokens so they never collide.
+//   fv_vtok_<uid>     = sentinel encrypted with PIN-derived key  (variant 'pin')
+//   fv_vtok_pk_<uid>  = sentinel encrypted with passkey key      (variant 'pk')
+function vaultTokenKey(userId, variant){
+  return variant === 'pk' ? 'fv_vtok_pk_' + userId : 'fv_vtok_' + userId;
+}
+
+async function saveVaultToken(key, userId, variant){
+  const prev = _vaultKey; _vaultKey = key;
+  const token = await encryptField(VAULT_SENTINEL);
+  _vaultKey = prev;
+  localStorage.setItem(vaultTokenKey(userId, variant), token);
+}
+
+async function verifyVaultKey(key, userId, variant){
+  const token = localStorage.getItem(vaultTokenKey(userId, variant));
+  if(!token) return false;
+  const prev = _vaultKey; _vaultKey = key;
+  const dec = await decryptField(token);
+  _vaultKey = prev;
+  return dec === VAULT_SENTINEL;
+}
+
+// ── After successful unlock — shared finalise logic ───────────────────
+async function finaliseUnlock(key, isCreate){
+  await persistVaultKey(key);
+  if(!isCreate){
+    // Decrypt in-memory data that was loaded raw before PIN entry
+    S.data.banks    = await decryptTable('bank_accounts',   S.data.banks);
+    S.data.loans    = await decryptTable('loans',           S.data.loans);
+    S.data.expenses = await decryptTable('expenses',        S.data.expenses);
+    S.data.income   = await decryptTable('income',          S.data.income);
+    S.data.crypto   = await decryptTable('crypto_wallets',  S.data.crypto);
+    S.data.assets   = await decryptTable('physical_assets', S.data.assets);
+  }
+  hideVaultOverlay();
+  renderAll();
+
+  // Offer passkey registration after first PIN unlock if not yet registered
+  if(!localStorage.getItem('fv_pk_' + S.user.id) && passkeySupported()){
+    setTimeout(()=>offerPasskeyRegistration(), 800);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// WEBAUTHN PASSKEY IMPLEMENTATION
+// Uses the PRF extension (Chrome 116+, Safari 17+, Firefox 119+) to
+// derive AES-GCM key material directly from the authenticator.
+// Falls back to credential ID as salt for PBKDF2 if PRF unavailable.
+// ══════════════════════════════════════════════════════════════════════
+
+const VAULT_RP = { id: location.hostname || 'localhost', name: 'Finova Vault' };
+const PASSKEY_LS = 'fv_pk_';   // localStorage key prefix for credential ID (base64url)
+
+function passkeySupported(){
+  return !!(window.PublicKeyCredential && navigator.credentials?.create);
+}
+
+// PRF salt — deterministic per-app constant (not secret)
+const PRF_SALT = new TextEncoder().encode('finova-vault-prf-v1');
+
+// Convert ArrayBuffer ↔ base64url
+function ab2b64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); }
+function b642ab(s){ const b=atob(s.replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(b,c=>c.charCodeAt(0)).buffer; }
+
+// Derive a 256-bit AES-GCM key from raw PRF output (or credential ID as fallback)
+async function keyFromBytes(bytes){
+  const raw = bytes instanceof ArrayBuffer ? bytes : bytes.buffer;
+  return crypto.subtle.importKey('raw', raw.slice(0,32), {name:'AES-GCM'}, true, ['encrypt','decrypt']);
+}
+
+// PBKDF2 key from credential ID bytes (PRF fallback)
+async function keyFromCredId(credIdBuf, userId){
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey('raw', credIdBuf, 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:enc.encode(userId), iterations:100_000, hash:'SHA-256'},
+    base, {name:'AES-GCM', length:256}, true, ['encrypt','decrypt']
+  );
+}
+
+// ── Register a new passkey ────────────────────────────────────────────
+async function registerPasskey(){
+  if(!passkeySupported()) throw new Error('WebAuthn not supported in this browser.');
+  const uid  = S.user.id;
+  const name = S.user.email || 'Finova User';
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const userId    = crypto.getRandomValues(new Uint8Array(16)); // opaque user handle
+
+  const cred = await navigator.credentials.create({ publicKey:{
+    challenge,
+    rp: VAULT_RP,
+    user:{ id: userId, name, displayName: 'Finova Vault' },
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{ userVerification:'required', residentKey:'preferred' },
+    timeout: 60000,
+    extensions:{ prf:{ eval:{ first: PRF_SALT } } }
+  }});
+
+  // Store credential ID so we can look it up on assertion
+  localStorage.setItem(PASSKEY_LS + uid, ab2b64(cred.rawId));
+
+  // Check if PRF output is available right from registration
+  const prfResult = cred.getClientExtensionResults()?.prf?.results?.first;
+  if(prfResult){
+    const key = await keyFromBytes(prfResult);
+    // Save a SEPARATE passkey verification token — never touches the PIN token
+    await saveVaultToken(key, uid, 'pk');
+    localStorage.setItem(PASSKEY_LS + uid + '_prf', '1');
+    return { key, method:'prf' };
+  }
+  // PRF not available — use credential ID as PBKDF2 salt
+  const key = await keyFromCredId(cred.rawId, uid);
+  // Save separate passkey token
+  await saveVaultToken(key, uid, 'pk');
+  return { key, method:'credid' };
+}
+
+// ── Assert (authenticate) with passkey ───────────────────────────────
+async function assertPasskey(){
+  const uid     = S.user?.id;
+  const credId  = localStorage.getItem(PASSKEY_LS + uid);
+  if(!credId) throw new Error('No passkey registered for this account.');
+
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const assertion = await navigator.credentials.get({ publicKey:{
+    challenge,
+    rpId: VAULT_RP.id,
+    allowCredentials:[{ id: b642ab(credId), type:'public-key' }],
+    userVerification: 'required',
+    timeout: 60000,
+    extensions:{ prf:{ eval:{ first: PRF_SALT } } }
+  }});
+
+  const prfResult = assertion.getClientExtensionResults()?.prf?.results?.first;
+  const hasPrf    = localStorage.getItem(PASSKEY_LS + uid + '_prf') === '1';
+
+  if(prfResult && hasPrf){
+    // PRF path — derive key from authenticator output
+    return { key: await keyFromBytes(prfResult), method:'prf' };
+  }
+  // Fallback — use credential ID as PBKDF2 salt
+  return { key: await keyFromCredId(assertion.rawId, uid), method:'credid' };
+}
+
+// ── Passkey Unlock flow ───────────────────────────────────────────────
+async function attemptPasskeyUnlock(){
+  const msg = $('vault-msg');
+  const btn = $('vault-passkey-btn');
+  if(btn){ btn.disabled=true; btn.querySelector('span:last-child').textContent='Waiting for authenticator…'; }
+  msg.textContent = '';
+  try{
+    const {key} = await assertPasskey();
+    // Verify against the PASSKEY-specific token (separate from the PIN token)
+    const ok = await verifyVaultKey(key, S.user.id, 'pk');
+    if(!ok){
+      msg.style.color='var(--red)';
+      msg.textContent='❌ Passkey not recognised. Use your PIN to unlock.';
+      return;
+    }
+    await finaliseUnlock(key, false);
+    toast('🪪 Vault unlocked with passkey', 's');
+  }catch(e){
+    if(e.name !== 'NotAllowedError'){
+      msg.style.color='var(--t2)';
+      msg.textContent = 'Passkey failed: ' + e.message;
+    }
+  }finally{
+    if(btn){ btn.disabled=false; btn.querySelector('span:last-child').textContent='Unlock with Passkey'; }
+  }
+}
+
+// ── Offer passkey registration after PIN unlock ───────────────────────
+// Shows an in-app banner (outside the vault overlay) so the user can tap it
+function offerPasskeyRegistration(){
+  if(!passkeySupported()) return;
+  // Remove any existing banner
+  document.getElementById('passkey-offer-banner')?.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'passkey-offer-banner';
+  banner.style.cssText = `
+    position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    z-index:9999;max-width:420px;width:calc(100% - 2rem);
+    background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(167,139,250,.12));
+    border:1.5px solid rgba(99,102,241,.4);border-radius:var(--r16);
+    padding:1rem 1.1rem;display:flex;align-items:center;gap:.85rem;
+    box-shadow:0 8px 32px rgba(0,0,0,.4);
+    animation:sIn .3s cubic-bezier(.4,0,.2,1) both;
+  `;
+  banner.innerHTML = `
+    <span style="font-size:1.5rem;flex-shrink:0">🪪</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:.875rem;margin-bottom:.15rem">Register a Passkey</div>
+      <div style="font-size:.75rem;color:var(--t2)">Use Face ID, fingerprint or device PIN next time</div>
+    </div>
+    <div style="display:flex;gap:.4rem;flex-shrink:0">
+      <button id="passkey-offer-yes" style="
+        background:var(--blue);color:#fff;border:none;border-radius:var(--r10);
+        padding:.42rem .85rem;font-size:.8rem;font-weight:700;cursor:pointer;
+        transition:opacity .15s">Set up</button>
+      <button id="passkey-offer-no" style="
+        background:none;color:var(--t3);border:1px solid var(--bd);border-radius:var(--r10);
+        padding:.42rem .7rem;font-size:.8rem;cursor:pointer">Later</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+
+  // Auto-dismiss after 12s
+  const timer = setTimeout(()=>banner.remove(), 12000);
+
+  document.getElementById('passkey-offer-no')?.addEventListener('click',()=>{
+    clearTimeout(timer); banner.remove();
+  });
+
+  document.getElementById('passkey-offer-yes')?.addEventListener('click', async()=>{
+    clearTimeout(timer); banner.remove();
+    const btn = document.getElementById('passkey-offer-yes');
+    try{
+      await registerPasskey();
+      toast('🪪 Passkey registered! Tap it on next login.', 's');
+    }catch(e){
+      if(e.name !== 'NotAllowedError'){
+        toast('Passkey registration failed: ' + e.message, 'e');
+      }
+    }
+  });
+}
+
+// ── Passkey button in overlay ─────────────────────────────────────────
+$('vault-passkey-btn')?.addEventListener('click', attemptPasskeyUnlock);
+
+// ── PIN Unlock Button ─────────────────────────────────────────────────
+$('vault-unlock-btn')?.addEventListener('click', async()=>{
+  const pin  = ($('vault-pin')?.value  || '').trim();
+  const pin2 = ($('vault-pin2')?.value || '').trim();
+  const msg  = $('vault-msg');
+  msg.textContent = '';
+
+  if(!pin)            { msg.textContent = 'Please enter your PIN.'; return; }
+  if(pin.length < 4)  { msg.textContent = 'PIN must be at least 4 characters.'; return; }
+  if(!S.user)         { msg.textContent = 'No user session — please sign in again.'; return; }
+
+  const hasToken = !!localStorage.getItem('fv_vtok_' + S.user.id);  // PIN token
+  const isCreate = !hasToken;
+
+  if(isCreate){
+    if(!pin2)        { msg.textContent = 'Please confirm your PIN.'; return; }
+    if(pin !== pin2) { msg.textContent = 'PINs do not match. Try again.'; return; }
+  }
+
+  const btn = $('vault-unlock-btn');
+  btn.disabled=true; btn.textContent = isCreate ? '🔐 Setting up…' : '🔓 Verifying…';
+
+  try{
+    const key = await deriveVaultKey(pin, S.user.id);
+    if(isCreate){
+      // First time: save PIN verification token then unlock
+      await saveVaultToken(key, S.user.id, 'pin');
+      await finaliseUnlock(key, true);
+      toast('🔐 Vault created! Device Master Key saved to this browser.', 's');
+    } else {
+      // Returning: verify PIN against the PIN-specific token
+      const ok = await verifyVaultKey(key, S.user.id, 'pin');
+      if(!ok){
+        msg.style.color='var(--red)';
+        msg.textContent='❌ Incorrect PIN. Please try again.';
+        $('vault-pin').value=''; $('vault-pin').focus();
+        return;
+      }
+      await finaliseUnlock(key, false);
+      toast('🔐 Vault unlocked', 's');
+    }
+  }catch(e){
+    msg.style.color='var(--red)';
+    msg.textContent='Error: '+e.message;
+  }finally{
+    btn.disabled=false;
+    btn.textContent = isCreate ? '🔐 Set Master Key & Encrypt' : '🔓 Unlock with Master Key';
+  }
+});
+
+// Enter key on PIN fields
+[$('vault-pin'),$('vault-pin2')].forEach(inp=>
+  inp?.addEventListener('keydown',e=>{ if(e.key==='Enter') $('vault-unlock-btn')?.click(); })
+);
+
+// ══════════════════════════════════════════════════════════════════════
 const ALLOWED_COLS={
   bank_accounts:   ['bank_name','account_name','balance','currency','account_number','funding_source','source_account_id','user_id'],
   cards:           ['card_name','bank','credit_limit','outstanding','due_date','card_number','user_id'],
@@ -1835,9 +2690,13 @@ function sanitiseRecord(tbl, rec){
 async function dbInsert(tbl,record){
   if(!sb) return {data:record,error:null};
   record.user_id=S.user.id;
-  const clean=sanitiseRecord(tbl,record);
+  let clean=sanitiseRecord(tbl,record);
+  // Encrypt sensitive fields before they leave the browser
+  if(_vaultKey) clean = await encryptRecord(tbl, clean);
   const {data,error}=await sb.from(tbl).insert([clean]).select().single();
-  return {data,error};
+  // Decrypt the returned record so the in-memory state stays readable
+  const decrypted = data && _vaultKey ? await decryptRecord(tbl, data) : data;
+  return {data: decrypted, error};
 }
 
 // ── SUPABASE DELETE ───────────────────────────────────────────────────
@@ -2411,12 +3270,27 @@ function renderBanks(){
   $('banks-list').innerHTML=banks.length?banks.map(b=>{
     const inc=S.data.income.filter(i=>String(i.account_id)===String(b.id)).reduce((s,i)=>s+(+i.amount||0),0);
     const exp=S.data.expenses.filter(e=>(e.paid_from||'').toLowerCase().includes((b.account_name||'').toLowerCase())).reduce((s,e)=>s+(+e.amount||0),0);
+    // Format account number: show last 4 digits, mask the rest
+    const acctNum=b.account_number||'';
+    const acctDisplay=acctNum.length>4
+      ? '•••• '+acctNum.slice(-4)
+      : acctNum;
     return `<div class="gc itm">
       <div class="ih">
         <div><div class="inm">${esc(b.account_name)}</div><div class="isub">${esc(b.bank_name)}</div></div>
         <span class="bdg">${esc(b.currency||'LKR')}</span>
       </div>
       <div class="iamt">${fmt(+b.balance)}</div>
+      ${acctNum?`<div style="display:flex;align-items:center;gap:.5rem;font-size:.76rem;color:var(--t2);font-family:monospace;letter-spacing:.06em">
+        <span>🏦</span>
+        <span id="acct-num-${b.id}">${esc(acctDisplay)}</span>
+        <button onclick="toggleAcctNum('${b.id}','${esc(acctNum)}')"
+          style="font-size:.68rem;color:var(--blue);background:none;border:none;cursor:pointer;padding:.1rem .3rem;border-radius:4px;transition:background var(--tr)"
+          title="Show/hide full number">👁</button>
+        <button onclick="copyText('${esc(acctNum)}','Account number copied!')"
+          style="font-size:.68rem;color:var(--t2);background:none;border:none;cursor:pointer;padding:.1rem .3rem;border-radius:4px;transition:background var(--tr)"
+          title="Copy account number">📋</button>
+      </div>`:''}
       <div style="display:flex;gap:1rem;font-size:.78rem">
         <span class="pos">↑ Income: ${fmt(inc)}</span>
         <span class="neg">↓ Expenses: ${fmt(exp)}</span>
@@ -2565,7 +3439,19 @@ function renderCrypto(){
       </div>
       <div class="iamt">${fmt(val)}</div>
       <div class="isub">≈ $${fmtD(usd)} · Buy: $${fmtD(+c.buy_price_usd)} · Now: $${fmtD(+c.current_price_usd)}</div>
-      ${(c.wallet_address||c.account_number)?`<div class="crypto-addr">📍 ${esc(c.wallet_address||c.account_number)}</div>`:''}
+      ${c.wallet_address?`
+      <div style="display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--t2)">
+        <span style="flex-shrink:0">📍</span>
+        <span id="waddr-${c.id}" style="font-family:monospace;font-size:.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px" title="${esc(c.wallet_address||'')}">
+          ${esc(truncateAddr(c.wallet_address||''))}
+        </span>
+        <button onclick="toggleWalletAddr('${c.id}','${esc(c.wallet_address||'')}')"
+          style="font-size:.68rem;color:var(--blue);background:none;border:none;cursor:pointer;flex-shrink:0;padding:.1rem .3rem;border-radius:4px"
+          title="Show full address">👁</button>
+        <button onclick="copyText('${esc(c.wallet_address||'')}','Wallet address copied!')"
+          style="font-size:.68rem;color:var(--t2);background:none;border:none;cursor:pointer;flex-shrink:0;padding:.1rem .3rem;border-radius:4px"
+          title="Copy address">📋</button>
+      </div>`:''}
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
         <button class="mature-btn" onclick="sellCrypto('${c.id}')">↗ Sell / Transfer</button>
         <button class="bdel" onclick="rmItem('crypto','${c.id}')">Delete</button>
@@ -2977,7 +3863,7 @@ const FORMS={
       {id:'amount',         lbl:'Amount (coins held)',      type:'number',ph:'0'},
       {id:'buy_price_usd',  lbl:'Buy Price per coin (USD)', type:'number',ph:'0'},
       {id:'funded_from',    lbl:'Funded From',             type:'select',opts:['__BANKSRC__']},
-      {id:'account_number', lbl:'Wallet Address',          type:'text',  ph:'0x… (optional)',optional:true},
+      {id:'wallet_address', lbl:'Wallet Address',          type:'text',  ph:'0x… (optional)',optional:true},
     ]
   },
   income:{
@@ -4150,6 +5036,65 @@ Object.entries(BTN_MAP).forEach(([bid,key])=>{
 // ── XSS ESCAPE ───────────────────────────────────────────────────────
 function esc(s){ const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
 
+// ── ACCOUNT NUMBER / WALLET ADDRESS HELPERS ───────────────────────────
+function truncateAddr(addr){
+  if(!addr) return '';
+  if(addr.length<=12) return addr;
+  // Long addresses (crypto): show first 6 + … + last 4
+  if(addr.length>20) return addr.slice(0,8)+'…'+addr.slice(-6);
+  // Medium (bank): mask middle
+  return addr.slice(0,4)+'••••'+addr.slice(-4);
+}
+
+// Toggle full/masked bank account number
+const _acctNumShown={};
+window.toggleAcctNum=function(id,fullNum){
+  const el=document.getElementById('acct-num-'+id);
+  if(!el) return;
+  _acctNumShown[id]=!_acctNumShown[id];
+  if(_acctNumShown[id]){
+    el.textContent=fullNum;
+    el.style.letterSpacing='.08em';
+  } else {
+    const masked=fullNum.length>4?'•••• '+fullNum.slice(-4):fullNum;
+    el.textContent=masked;
+    el.style.letterSpacing='.06em';
+  }
+};
+
+// Toggle full/truncated wallet address
+const _walletShown={};
+window.toggleWalletAddr=function(id,fullAddr){
+  const el=document.getElementById('waddr-'+id);
+  if(!el) return;
+  _walletShown[id]=!_walletShown[id];
+  if(_walletShown[id]){
+    el.textContent=fullAddr;
+    el.style.maxWidth='100%';
+    el.style.overflow='visible';
+    el.style.whiteSpace='normal';
+    el.style.wordBreak='break-all';
+  } else {
+    el.textContent=truncateAddr(fullAddr);
+    el.style.maxWidth='180px';
+    el.style.overflow='hidden';
+    el.style.whiteSpace='nowrap';
+    el.style.wordBreak='normal';
+  }
+};
+
+// Copy to clipboard with toast
+window.copyText=function(text,msg){
+  navigator.clipboard?.writeText(text).then(()=>toast(msg||'Copied!','s')).catch(()=>{
+    // Fallback for older browsers / file:// protocol
+    const ta=document.createElement('textarea');
+    ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast(msg||'Copied!','s');
+  });
+};
+
 // ════════════════════════════════════════════════════════
 // LOANS MODULE
 // ════════════════════════════════════════════════════════
@@ -4640,6 +5585,26 @@ function openAccountSettings(){
   const email=user.email||'';
   const name=user.user_metadata?.full_name||email.split('@')[0]||'User';
   setText('mtitle','⚙️ Account Settings');
+  // Load registered devices asynchronously after modal opens
+  let _devicesCache = [];
+  async function loadDevicesHtml(){
+    const uid = S.user.id;
+    const did = getDeviceId();
+    const {data:devs} = await sb.from('registered_devices').select('*').eq('user_id',uid).order('last_used',{ascending:false}).catch(()=>({data:[]}));
+    _devicesCache = devs||[];
+    const el = document.getElementById('acct-devices-list');
+    if(!el) return;
+    if(!_devicesCache.length){ el.innerHTML='<p style="font-size:.8rem;color:var(--t2)">No devices found.</p>'; return; }
+    el.innerHTML = _devicesCache.map(d=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem .8rem;border-radius:var(--r10);background:var(--gl);border:1.5px solid var(--bd);margin-bottom:.45rem">
+        <div>
+          <div style="font-weight:600;font-size:.875rem">${esc(d.device_name||'Unknown Device')} ${d.device_id===did?'<span style="font-size:.68rem;background:rgba(74,222,128,.15);color:var(--green);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:.1rem .4rem;margin-left:.3rem">This device</span>':''}</div>
+          <div style="font-size:.72rem;color:var(--t2);margin-top:.1rem">Last used: ${d.last_used?new Date(d.last_used).toLocaleString():'—'} · ${d.is_verified?'✅ Verified':'⏳ Pending'}</div>
+        </div>
+        ${d.device_id!==did ? `<button class="bdel" data-devid="${esc(d.device_id)}" data-devname="${esc(d.device_name||'device')}" onclick="removeDeviceClick(this)">Remove</button>` : ''}
+      </div>`).join('');
+  }
+
   $('mbody').innerHTML=`
     <div style="display:flex;align-items:center;gap:.9rem;margin-bottom:1.2rem;padding:.9rem;background:var(--gl);border:1.5px solid var(--bd);border-radius:var(--r10)">
       <div class="uav" style="width:44px;height:44px;font-size:1.1rem">${name[0].toUpperCase()}</div>
@@ -4652,11 +5617,59 @@ function openAccountSettings(){
     <div class="mfg"><label>Confirm New Password</label>
       <input type="password" id="acct-pw2" placeholder="Repeat password" autocomplete="new-password"/></div>
     <p id="acct-msg" style="min-height:1rem;font-size:.8rem;text-align:center;color:var(--t2)"></p>
-    <div class="acct-danger">
+
+    <!-- ── Registered Devices Section ── -->
+    <div style="margin-top:.6rem;padding-top:.9rem;border-top:1.5px solid var(--bd)">
+      <h4 style="font-size:.82rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--t2);margin-bottom:.7rem">📱 Registered Devices</h4>
+      <p style="font-size:.75rem;color:var(--t3);margin-bottom:.65rem;line-height:1.5">
+        Up to 3 devices can be registered. Each device uses a persistent Device Master Key.
+        To remove a device, an Email OTP is required for security.
+      </p>
+      <div id="acct-devices-list" style="min-height:2.5rem">
+        <p style="font-size:.8rem;color:var(--t2)">Loading devices…</p>
+      </div>
+    </div>
+
+    <div class="acct-danger" style="margin-top:.6rem">
       <h4>⚠️ Danger Zone</h4>
       <p style="font-size:.8rem;color:var(--t2);margin-bottom:.7rem">Deleting your account will permanently erase all your data and cannot be undone.</p>
       <button class="btn" style="background:var(--red);color:#fff;font-size:.82rem;padding:.5rem 1rem;border-radius:var(--r10)" id="acct-delete-btn">🗑 Delete My Account</button>
     </div>`;
+
+  // Load devices after DOM is ready
+  setTimeout(loadDevicesHtml, 50);
+
+  // removeDeviceClick — global so onclick="" works
+  window.removeDeviceClick = async function(btn){
+    const devId   = btn.dataset.devid;
+    const devName = btn.dataset.devname;
+    if(!devId) return;
+
+    const email = S.user?.email || 'your email';
+    const sent  = await sendRemovalOtp();
+    if(!sent){ toast('Could not send OTP — check your connection.','e'); return; }
+
+    const ok = await showOtpModal({
+      title:    '🗑 Remove Device',
+      subtitle: `Confirm removal of <strong>${esc(devName)}</strong>.<br>Enter the verification code sent to <strong>${email}</strong>.`,
+      onVerify: async(token)=>{
+        const { data, error } = await sb.auth.verifyOtp({
+          email: S.user.email, token, type:'email'
+        });
+        if(error) return false;
+        const {error:delErr} = await sb.from('registered_devices')
+          .delete().eq('user_id', S.user.id).eq('device_id', devId);
+        return !delErr;
+      },
+      onResend: sendRemovalOtp,
+    });
+
+    if(ok){
+      toast(`✅ Device "${devName}" removed.`, 's');
+      await loadDevicesHtml();
+    }
+  };
+
 
   $('mov').classList.remove('dn');
   const origSave=$('msave').onclick;
@@ -4714,10 +5727,13 @@ function openAccountSettings(){
           document.body.appendChild(overlay);
 
           try{
-            // Step 1: Clear all localStorage data first
-            ['fv_cash_','fv_cashlog_','fv_theme','fv_lu_'].forEach(k=>{
+            // Step 1: Clear all localStorage data first (including vault token & device key)
+            ['fv_cash_','fv_cashlog_','fv_theme','fv_lu_','fv_vtok_','fv_vtok_pk_','fv_pk_','fv_vk_','fv_device_'].forEach(k=>{
               Object.keys(localStorage).filter(key=>key.includes(k)).forEach(key=>localStorage.removeItem(key));
             });
+
+            // Step 1b: Remove all registered devices for this user
+            await sb.from('registered_devices').delete().eq('user_id', S.user.id).catch(()=>{});
 
             // Step 2: Call the PostgreSQL RPC function that runs as SECURITY DEFINER
             // This function deletes all public table rows AND the auth.users record
@@ -4930,6 +5946,33 @@ $('tb-qadd')?.addEventListener('click', openQuickAdd);
 Run ALL of this in your Supabase SQL Editor (Dashboard → SQL Editor → New Query).
 Run in order. Safe to re-run — uses IF NOT EXISTS / OR REPLACE.
 ═══════════════════════════════════════════════════════════════════════════════
+
+
+-- ═══════════════════════════════════════════════════════════
+-- REGISTERED DEVICES TABLE — Device-Based Security Model
+-- Run in Supabase SQL Editor. Safe to re-run.
+-- ═══════════════════════════════════════════════════════════
+
+create table if not exists registered_devices (
+  id           uuid primary key default gen_random_uuid(),
+  device_id    text not null,               -- client-generated stable fingerprint
+  user_id      uuid references auth.users(id) on delete cascade not null,
+  device_name  text not null default 'Unknown Device',
+  last_used    timestamptz default now(),
+  is_verified  boolean not null default false,
+  created_at   timestamptz default now(),
+  unique(device_id)
+);
+
+alter table registered_devices enable row level security;
+drop policy if exists "own_devices" on registered_devices;
+create policy "own_devices" on registered_devices
+  for all using (auth.uid() = user_id);
+
+-- Add to nuclear delete function (delete registered_devices before auth.users)
+-- Paste the following line into the delete_user_entirely() function body,
+-- BEFORE the "delete from auth.users" statement:
+--   delete from public.registered_devices where user_id = uid;
 
 -- ═══════════════════════════════════════════
 -- PHASE 1: CORE TABLES
@@ -5165,6 +6208,33 @@ create trigger trg_ledger_balance_sync
   after insert on unified_ledger
   for each row execute function sync_bank_balance_from_ledger();
 
+-- ═══════════════════════════════════════════════════════════
+-- ZERO-KNOWLEDGE CSE — SCHEMA MIGRATION
+-- Run if you are enabling client-side encryption for the first time.
+-- Numeric fields that store encrypted strings must be TEXT columns.
+-- ═══════════════════════════════════════════════════════════
+
+-- bank_accounts: account_name and bank_name may store encrypted text
+-- These columns are already TEXT so no change needed.
+-- account_number is already TEXT.
+
+-- loans: loan_name, lender already TEXT.
+
+-- expenses / income: description already TEXT.
+
+-- crypto_wallets: wallet_name, wallet_address already TEXT.
+
+-- physical_assets: asset_name, description already TEXT.
+
+-- NOTE: Numeric columns (balance, amount, principal_amount etc.) are NOT
+-- encrypted — they remain NUMERIC so all dashboard math (.reduce sums)
+-- works without client-side decryption on every render. Only string
+-- identifiers that expose personal financial identity are encrypted.
+
+-- If you want to verify no numeric columns were accidentally changed:
+-- SELECT column_name, data_type FROM information_schema.columns
+-- WHERE table_name='bank_accounts' AND table_schema='public';
+
 -- ═══════════════════════════════════════════
 -- MIGRATION HELPERS (safe to run any time)
 -- ═══════════════════════════════════════════
@@ -5220,6 +6290,7 @@ begin
   end if;
 
   -- Step 1: Wipe all public table data for this user
+  delete from public.registered_devices where user_id = uid;
   delete from public.unified_ledger    where user_id = uid;
   delete from public.income            where user_id = uid;
   delete from public.expenses          where user_id = uid;
