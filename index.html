@@ -1838,12 +1838,14 @@ $('btn-signup').addEventListener('click', async()=>{
 async function doSignOut(){
   clearInterval(S.stockRefreshTimer);
   if(S.realtimeChannel&&sb) sb.removeChannel(S.realtimeChannel);
-  // Remove this device entry from Supabase before signing out
-  if(sb && S.user){
-    const did = getDeviceId();
-    await sb.from('registered_devices').delete()
-      .eq('user_id', S.user.id).eq('device_id', did).catch(()=>{});
-  }
+  // Fire-and-forget device removal — never let it block or delay sign-out
+  try{
+    if(sb && S.user){
+      const did = getDeviceId();
+      sb.from('registered_devices').delete()
+        .eq('user_id', S.user.id).eq('device_id', did).then(()=>{}).catch(()=>{});
+    }
+  }catch(_){}
   clearVaultKey(); // wipe the encryption key from memory and localStorage
   if(sb) await sb.auth.signOut();
   S.user=null;
@@ -1873,6 +1875,11 @@ if(sb){
     }
 
     // ── NORMAL SIGNED_IN / INITIAL_SESSION ────────────────────────────
+    // Guard: if an OTP was just sent for device verification, the supabase SDK
+    // fires another SIGNED_IN event — skip re-processing to avoid a loop.
+    if((event==='SIGNED_IN' || event==='INITIAL_SESSION') && session?.user && S._deviceOtpInFlight){
+      return; // OTP in progress — ignore this re-auth event
+    }
     if((event==='SIGNED_IN' || event==='INITIAL_SESSION') && session?.user && !S.user){
       S.user = session.user;
 
@@ -2116,66 +2123,86 @@ function getDeviceName(){
 // Check and register this device. Returns: 'ok', 'otp_required', 'blocked'
 async function checkAndRegisterDevice(){
   if(!sb || !S.user) return 'ok';
-  const uid  = S.user.id;
-  const did  = getDeviceId();
+  const uid   = S.user.id;
+  const did   = getDeviceId();
   const dname = getDeviceName();
 
-  // Check if this device is already registered and verified
-  const { data: existing } = await sb.from('registered_devices')
-    .select('*').eq('user_id', uid).eq('device_id', did).maybeSingle();
+  // ── Check if this device is already registered ──────────────────────
+  let existing = null;
+  try{
+    const { data, error } = await sb.from('registered_devices')
+      .select('*').eq('user_id', uid).eq('device_id', did).maybeSingle();
+    // If table doesn't exist yet, treat as first-run (graceful degradation)
+    if(error && (error.code === '42P01' || error.message?.includes('does not exist'))){
+      console.warn('[Finova] registered_devices table missing — skipping device check. Run the DDL from the schema section.');
+      return 'ok';
+    }
+    existing = data;
+  }catch(e){ console.warn('[Finova] Device check error:', e); return 'ok'; }
 
   if(existing){
     if(existing.is_verified){
-      // Update last_used
-      await sb.from('registered_devices').update({ last_used: new Date().toISOString() })
-        .eq('id', existing.id).catch(()=>{});
+      // Update last_used (fire-and-forget)
+      sb.from('registered_devices').update({ last_used: new Date().toISOString() })
+        .eq('id', existing.id).then(()=>{}).catch(()=>{});
       return 'ok';
     } else {
-      // Was registered but not yet verified (previous OTP session)
+      // Registered but OTP not yet completed in a previous session
       return 'otp_required';
     }
   }
 
-  // New device — count existing registered + verified devices
-  const { data: allDevices } = await sb.from('registered_devices')
-    .select('id').eq('user_id', uid).eq('is_verified', true);
-  const count = allDevices?.length || 0;
+  // ── New device — count how many verified devices this user has ───────
+  let count = 0;
+  try{
+    const { data: allDevices, error: cntErr } = await sb.from('registered_devices')
+      .select('id').eq('user_id', uid).eq('is_verified', true);
+    if(cntErr) return 'ok'; // table issues — don't block login
+    count = allDevices?.length || 0;
+  }catch(e){ return 'ok'; }
 
-  if(count >= 3){
-    return 'blocked';
-  }
+  if(count >= 3) return 'blocked';
 
   if(count === 0){
-    // First device — auto-register without OTP
-    await sb.from('registered_devices').insert({
-      device_id: did,
-      user_id:   uid,
-      device_name: dname,
-      last_used: new Date().toISOString(),
-      is_verified: true
-    }).catch(()=>{});
+    // First device — auto-register, no OTP needed
+    try{
+      await sb.from('registered_devices').insert({
+        device_id:   did,
+        user_id:     uid,
+        device_name: dname,
+        last_used:   new Date().toISOString(),
+        is_verified: true
+      });
+    }catch(_){}
     return 'ok';
   }
 
-  // 2nd or 3rd device — insert as unverified, then require OTP
-  await sb.from('registered_devices').upsert({
-    device_id: did,
-    user_id:   uid,
-    device_name: dname,
-    last_used: new Date().toISOString(),
-    is_verified: false
-  }, { onConflict: 'device_id' }).catch(()=>{});
+  // 2nd or 3rd device — insert unverified row, then prompt OTP
+  try{
+    await sb.from('registered_devices').upsert({
+      device_id:   did,
+      user_id:     uid,
+      device_name: dname,
+      last_used:   new Date().toISOString(),
+      is_verified: false
+    }, { onConflict: 'device_id' });
+  }catch(_){}
 
   return 'otp_required';
 }
 
 // Send OTP via Supabase (uses the built-in email OTP flow)
+// NOTE: signInWithOtp will fire a SIGNED_IN event — we suppress re-processing
+// with the _deviceOtpInFlight guard on the auth state change handler.
 async function sendDeviceOtp(){
   if(!sb || !S.user?.email) return false;
+  S._deviceOtpInFlight = true;
   const { error } = await sb.auth.signInWithOtp({
     email: S.user.email,
     options: { shouldCreateUser: false }
   });
+  // Keep flag set until verifyOtp completes (cleared in verifyDeviceOtp)
+  if(error) S._deviceOtpInFlight = false;
   return !error;
 }
 
@@ -2187,14 +2214,17 @@ async function verifyDeviceOtp(token){
     token: token,
     type: 'email'
   });
+  S._deviceOtpInFlight = false; // clear the guard regardless of outcome
   if(error) return false;
 
   // Mark device as verified
   const did = getDeviceId();
-  await sb.from('registered_devices').update({
-    is_verified: true,
-    last_used: new Date().toISOString()
-  }).eq('user_id', S.user.id).eq('device_id', did).catch(()=>{});
+  try{
+    await sb.from('registered_devices').update({
+      is_verified: true,
+      last_used: new Date().toISOString()
+    }).eq('user_id', S.user.id).eq('device_id', did);
+  }catch(_){}
 
   return true;
 }
