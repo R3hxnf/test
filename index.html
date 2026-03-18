@@ -1376,11 +1376,11 @@ img{max-width:100%}
     padding:2rem 1.8rem 1.6rem;text-align:center">
     <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,rgba(59,130,246,.22),rgba(167,139,250,.18));border:1.5px solid rgba(59,130,246,.35);display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin:0 auto .9rem">📧</div>
     <h2 id="otp-modal-title" style="font-size:1.1rem;font-weight:700;margin-bottom:.3rem;letter-spacing:-.03em">Verify Your Email</h2>
-    <p id="otp-modal-sub" style="font-size:.8rem;color:var(--t2);margin-bottom:1.2rem;line-height:1.5">A 6-digit code has been sent to your email address.</p>
+    <p id="otp-modal-sub" style="font-size:.8rem;color:var(--t2);margin-bottom:1.2rem;line-height:1.5">An 8-digit code has been sent to your email address.</p>
     <div class="fg" style="text-align:left;margin-bottom:.75rem">
       <label>One-Time Code</label>
-      <input id="otp-code-input" type="text" inputmode="numeric" maxlength="6"
-        placeholder="• • • • • •" autocomplete="one-time-code"
+      <input id="otp-code-input" type="text" inputmode="numeric" maxlength="8"
+        placeholder="• • • • • • • •" autocomplete="one-time-code"
         style="height:52px;font-size:1.5rem;letter-spacing:.4em;text-align:center;font-family:monospace"/>
     </div>
     <button id="otp-submit-btn" class="btn bp bfull" style="height:44px;font-size:.9rem;font-weight:700;margin-bottom:.6rem">Verify Code</button>
@@ -1875,36 +1875,57 @@ if(sb){
     }
 
     // ── NORMAL SIGNED_IN / INITIAL_SESSION ────────────────────────────
-    // Guard: if an OTP was just sent for device verification, the supabase SDK
-    // fires another SIGNED_IN event — skip re-processing to avoid a loop.
-    if((event==='SIGNED_IN' || event==='INITIAL_SESSION') && session?.user && S._deviceOtpInFlight){
-      return; // OTP in progress — ignore this re-auth event
-    }
-    if((event==='SIGNED_IN' || event==='INITIAL_SESSION') && session?.user && !S.user){
-      S.user = session.user;
+    if((event==='SIGNED_IN' || event==='INITIAL_SESSION') && session?.user){
 
-      // Google OAuth first-time onboarding
-      const isOAuth=session.user?.app_metadata?.provider==='google'||
-                    (session.user?.identities||[]).some(id=>id.provider==='google');
-      const isNewOAuth=isOAuth && event==='SIGNED_IN' &&
-                       !session.user?.user_metadata?.finova_initialized;
-      if(isNewOAuth&&sb){
-        await sb.auth.updateUser({data:{finova_initialized:true}}).catch(()=>{});
+      // ── Magic link device verification return ─────────────────────────
+      // If this SIGNED_IN was triggered by clicking the device registration
+      // magic link, auto-verify the pending device and continue loading.
+      const pendingUid = session.user.id;
+      const isPendingDevice = !!localStorage.getItem('fv_dev_pending_' + pendingUid);
+      if(isPendingDevice && S.user){
+        // App already loaded — just verify the device and dismiss the wait screen
+        await completeMagicLinkVerification(pendingUid);
+        // The wait screen's poll loop will detect the flag is gone and auto-close
+        return;
+      }
+      if(isPendingDevice && !S.user){
+        // Fresh page load after magic link click (new tab/window)
+        S.user = session.user;
+        await completeMagicLinkVerification(pendingUid);
+        await loadVaultKeyFromSession();
+        await loadAll();
+        launch();
+        if(!_vaultKey) showVaultOverlay();
+        return;
       }
 
-      // Try to restore vault key from localStorage (device-persistent)
-      await loadVaultKeyFromSession();
+      // ── Normal first-time login ───────────────────────────────────────
+      if(!S.user){
+        S.user = session.user;
 
-      await loadAll();
-      launch();
+        // Google OAuth first-time onboarding
+        const isOAuth=session.user?.app_metadata?.provider==='google'||
+                      (session.user?.identities||[]).some(id=>id.provider==='google');
+        const isNewOAuth=isOAuth && event==='SIGNED_IN' &&
+                         !session.user?.user_metadata?.finova_initialized;
+        if(isNewOAuth&&sb){
+          await sb.auth.updateUser({data:{finova_initialized:true}}).catch(()=>{});
+        }
 
-      // Check device registration — blocks or prompts OTP for new devices
-      const deviceOk = await handleDeviceRegistration();
-      if(!deviceOk) return; // sign-out was triggered inside handleDeviceRegistration
+        // Try to restore vault key from localStorage (device-persistent)
+        await loadVaultKeyFromSession();
 
-      // Show vault overlay if no key was restored — user must set/enter Master Key
-      if(!_vaultKey){
-        showVaultOverlay();
+        await loadAll();
+        launch();
+
+        // Check device registration — sends magic link for new devices
+        const deviceOk = await handleDeviceRegistration();
+        if(!deviceOk) return; // sign-out was triggered inside handleDeviceRegistration
+
+        // Show vault overlay if no key was restored — user must set/enter Master Key
+        if(!_vaultKey){
+          showVaultOverlay();
+        }
       }
     }
 
@@ -2147,8 +2168,8 @@ async function checkAndRegisterDevice(){
         .eq('id', existing.id).then(()=>{}).catch(()=>{});
       return 'ok';
     } else {
-      // Registered but OTP not yet completed in a previous session
-      return 'otp_required';
+      // Registered but magic link not yet clicked in a previous session
+      return 'magic_link_required';
     }
   }
 
@@ -2177,7 +2198,7 @@ async function checkAndRegisterDevice(){
     return 'ok';
   }
 
-  // 2nd or 3rd device — insert unverified row, then prompt OTP
+  // 2nd or 3rd device — insert unverified row, then send magic link
   try{
     await sb.from('registered_devices').upsert({
       device_id:   did,
@@ -2188,50 +2209,128 @@ async function checkAndRegisterDevice(){
     }, { onConflict: 'device_id' });
   }catch(_){}
 
-  return 'otp_required';
+  return 'magic_link_required';
 }
 
-// Send OTP via Supabase (uses the built-in email OTP flow)
-// NOTE: signInWithOtp will fire a SIGNED_IN event — we suppress re-processing
-// with the _deviceOtpInFlight guard on the auth state change handler.
-async function sendDeviceOtp(){
-  if(!sb || !S.user?.email) return false;
-  S._deviceOtpInFlight = true;
-  const { error } = await sb.auth.signInWithOtp({
-    email: S.user.email,
-    options: { shouldCreateUser: false }
-  });
-  // Keep flag set until verifyOtp completes (cleared in verifyDeviceOtp)
-  if(error) S._deviceOtpInFlight = false;
-  return !error;
+// ── DEVICE MAGIC LINK SYSTEM ────────────────────────────────────────
+// Uses Supabase magic link (what the free tier supports).
+// Flow: send magic link → user clicks it → SIGNED_IN fires → auto-verify.
+// ─────────────────────────────────────────────────────────────────────
+
+// localStorage key to flag that THIS device is awaiting magic link verification
+function devicePendingKey(uid){ return 'fv_dev_pending_' + uid; }
+
+async function sendDeviceMagicLink(){
+  if(!S.user?.email) return { ok:false, error:'No email on account.' };
+  try{
+    const { error } = await sb.auth.signInWithOtp({
+      email: S.user.email,
+      options: { shouldCreateUser: false }
+    });
+    if(error){
+      console.warn('[Finova] Magic link send failed:', error.message);
+      return { ok:false, error: error.message };
+    }
+    // Mark this device as waiting for magic link click
+    localStorage.setItem(devicePendingKey(S.user.id), '1');
+    return { ok:true };
+  }catch(e){
+    console.warn('[Finova] Magic link send exception:', e);
+    return { ok:false, error: e.message };
+  }
 }
 
-// Verify OTP token entered by user and mark device as verified
-async function verifyDeviceOtp(token){
-  if(!sb || !S.user?.email) return false;
-  const { data, error } = await sb.auth.verifyOtp({
-    email: S.user.email,
-    token: token,
-    type: 'email'
-  });
-  S._deviceOtpInFlight = false; // clear the guard regardless of outcome
-  if(error) return false;
+// Called when SIGNED_IN fires after magic link click — auto-verifies the device
+async function completeMagicLinkVerification(uid){
+  const pendingKey = devicePendingKey(uid);
+  if(!localStorage.getItem(pendingKey)) return false; // not a pending device
+  localStorage.removeItem(pendingKey);
 
-  // Mark device as verified
   const did = getDeviceId();
   try{
     await sb.from('registered_devices').update({
       is_verified: true,
       last_used: new Date().toISOString()
-    }).eq('user_id', S.user.id).eq('device_id', did);
-  }catch(_){}
-
-  return true;
+    }).eq('user_id', uid).eq('device_id', did);
+    console.log('[Finova] Device verified via magic link');
+    return true;
+  }catch(e){
+    console.warn('[Finova] Device verify update failed:', e);
+    return false;
+  }
 }
 
-// Send OTP for device removal verification
-async function sendRemovalOtp(){
-  return sendDeviceOtp();
+// Show "waiting for magic link" screen — replaces the OTP modal
+function showMagicLinkWaitScreen(email, onResend){
+  return new Promise(resolve => {
+    const ov   = document.getElementById('otp-modal-ov');
+    const tEl  = document.getElementById('otp-modal-title');
+    const sEl  = document.getElementById('otp-modal-sub');
+    const inp  = document.getElementById('otp-code-input');
+    const sub  = document.getElementById('otp-submit-btn');
+    const rsnd = document.getElementById('otp-resend-btn');
+    const msg  = document.getElementById('otp-msg');
+    const cncl = document.getElementById('otp-cancel-btn');
+
+    tEl.textContent = '📧 Check Your Email';
+    sEl.innerHTML   = `A sign-in link was sent to <strong>${email}</strong>.<br><br>
+      <span style="color:var(--t2);font-size:.78rem">Click the link in the email to verify this device and continue.<br>
+      This tab will update automatically once you click it.</span>`;
+
+    // Hide the code input — not needed for magic link
+    inp.style.display  = 'none';
+    sub.style.display  = 'none';
+    msg.textContent    = '';
+
+    rsnd.textContent   = 'Resend link';
+    rsnd.style.display = '';
+    cncl.textContent   = 'Cancel — sign out';
+    cncl.style.display = '';
+
+    ov.classList.remove('dn');
+    ov.style.display = 'flex';
+
+    function cleanup(){
+      ov.classList.add('dn');
+      ov.style.display = '';
+      inp.style.display  = '';
+      sub.style.display  = '';
+      cncl.textContent   = 'Cancel';
+      rsnd.textContent   = 'Resend code';
+      rsnd.onclick = null;
+      cncl.onclick = null;
+    }
+
+    rsnd.onclick = async () => {
+      rsnd.disabled = true; rsnd.textContent = 'Sending…';
+      const r = await onResend();
+      rsnd.disabled = false;
+      rsnd.textContent = r.ok ? '✅ Link sent!' : '❌ ' + (r.error||'Failed');
+      setTimeout(()=>{ rsnd.textContent = 'Resend link'; }, 4000);
+    };
+
+    cncl.onclick = () => { cleanup(); resolve(false); };
+
+    // Auto-resolve when the magic link is clicked and SIGNED_IN fires
+    // We poll localStorage for the pending flag being cleared
+    const poll = setInterval(()=>{
+      if(!localStorage.getItem(devicePendingKey(S.user?.id||''))){
+        clearInterval(poll);
+        cleanup();
+        resolve(true);
+      }
+    }, 800);
+
+    // Also listen for the Supabase auth event directly
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, session)=>{
+      if(event === 'SIGNED_IN' && session?.user){
+        clearInterval(poll);
+        subscription.unsubscribe();
+        cleanup();
+        resolve(true);
+      }
+    });
+  });
 }
 
 // Show the OTP modal. Returns a Promise that resolves with true (verified) or false (cancelled).
@@ -2247,7 +2346,7 @@ function showOtpModal({ title, subtitle, onVerify, onResend }){
     const cncl = document.getElementById('otp-cancel-btn');
 
     tEl.textContent    = title    || 'Verify Your Email';
-    sEl.innerHTML      = subtitle || 'Enter the 6-digit code sent to your email.';
+    sEl.innerHTML      = subtitle || 'Check your email and click the sign-in link.';
     inp.value          = '';
     msg.textContent    = '';
     msg.style.color    = 'var(--red)';
@@ -2269,7 +2368,7 @@ function showOtpModal({ title, subtitle, onVerify, onResend }){
 
     sub.onclick = async () => {
       const code = inp.value.trim();
-      if(code.length < 6){ msg.textContent = 'Enter the full 6-digit code.'; return; }
+      if(code.length < 8){ msg.textContent = 'Enter the full 8-digit code.'; return; }
       sub.disabled = true; sub.textContent = 'Verifying…';
       msg.textContent = '';
       const ok = await onVerify(code);
@@ -2284,9 +2383,9 @@ function showOtpModal({ title, subtitle, onVerify, onResend }){
 
     rsnd.onclick = async () => {
       rsnd.textContent = 'Sending…'; rsnd.disabled = true;
-      const ok = await (onResend ? onResend() : sendDeviceOtp());
+      const rsndResult = onResend ? await onResend() : (await sendDeviceOtp()).ok;
       rsnd.disabled = false;
-      rsnd.textContent = ok ? '✅ Sent!' : '❌ Failed';
+      rsnd.textContent = rsndResult ? '✅ Sent!' : '❌ Failed';
       setTimeout(()=>{ rsnd.textContent = 'Resend code'; }, 3000);
     };
 
@@ -2302,7 +2401,7 @@ async function handleDeviceRegistration(){
   if(status === 'ok') return true;
 
   if(status === 'blocked'){
-    // Show blocking message
+    // Show blocking message — user must remove a device first
     return new Promise(resolve => {
       const ov   = document.getElementById('otp-modal-ov');
       const tEl  = document.getElementById('otp-modal-title');
@@ -2313,42 +2412,43 @@ async function handleDeviceRegistration(){
       const inp  = document.getElementById('otp-code-input');
       const msg  = document.getElementById('otp-msg');
 
-      tEl.textContent = '🚫 Device Limit Reached';
-      sEl.innerHTML   = 'You already have <strong>3 registered devices</strong>. Remove an existing device from <strong>Account Settings → Registered Devices</strong> before adding a new one.';
-      inp.style.display = 'none';
-      sub.style.display = 'none';
+      tEl.textContent    = '🚫 Device Limit Reached';
+      sEl.innerHTML      = 'You already have <strong>3 registered devices</strong>.<br><br>Remove an existing device from <strong>Account Settings → Registered Devices</strong> before adding this one.';
+      inp.style.display  = 'none';
+      sub.style.display  = 'none';
       rsnd.style.display = 'none';
-      msg.textContent = '';
+      msg.textContent    = '';
 
       ov.classList.remove('dn');
       ov.style.display = 'flex';
 
       cncl.textContent = 'Sign Out';
       cncl.onclick = () => {
-        inp.style.display = '';
-        sub.style.display = '';
+        inp.style.display  = '';
+        sub.style.display  = '';
         rsnd.style.display = '';
-        cncl.textContent = 'Cancel';
+        cncl.textContent   = 'Cancel';
         ov.classList.add('dn');
-        ov.style.display = '';
+        ov.style.display   = '';
         resolve(false);
         doSignOut();
       };
     });
   }
 
-  // OTP required — send it first
-  const sent = await sendDeviceOtp();
+  // magic_link_required — send magic link and wait for user to click it
   const email = S.user?.email || 'your email';
-  const ok = await showOtpModal({
-    title:    '🔐 New Device Registration',
-    subtitle: `A verification code was sent to <strong>${email}</strong>.<br>Enter it below to register this device.`,
-    onVerify: verifyDeviceOtp,
-    onResend: sendDeviceOtp,
-  });
+  const sendResult = await sendDeviceMagicLink();
 
-  if(!ok){
-    // User cancelled — sign out so they don't get a partial session
+  if(!sendResult.ok){
+    // Show error but still show wait screen so user can retry
+    toast('⚠️ Could not send link: ' + (sendResult.error||'Unknown error'), 'e');
+  }
+
+  const verified = await showMagicLinkWaitScreen(email, sendDeviceMagicLink);
+
+  if(!verified){
+    // User cancelled
     await doSignOut();
     return false;
   }
@@ -5620,18 +5720,56 @@ function openAccountSettings(){
   async function loadDevicesHtml(){
     const uid = S.user.id;
     const did = getDeviceId();
-    const {data:devs} = await sb.from('registered_devices').select('*').eq('user_id',uid).order('last_used',{ascending:false}).catch(()=>({data:[]}));
-    _devicesCache = devs||[];
     const el = document.getElementById('acct-devices-list');
     if(!el) return;
-    if(!_devicesCache.length){ el.innerHTML='<p style="font-size:.8rem;color:var(--t2)">No devices found.</p>'; return; }
-    el.innerHTML = _devicesCache.map(d=>`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem .8rem;border-radius:var(--r10);background:var(--gl);border:1.5px solid var(--bd);margin-bottom:.45rem">
-        <div>
-          <div style="font-weight:600;font-size:.875rem">${esc(d.device_name||'Unknown Device')} ${d.device_id===did?'<span style="font-size:.68rem;background:rgba(74,222,128,.15);color:var(--green);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:.1rem .4rem;margin-left:.3rem">This device</span>':''}</div>
-          <div style="font-size:.72rem;color:var(--t2);margin-top:.1rem">Last used: ${d.last_used?new Date(d.last_used).toLocaleString():'—'} · ${d.is_verified?'✅ Verified':'⏳ Pending'}</div>
+
+    el.innerHTML = '<p style="font-size:.8rem;color:var(--t2)">Loading…</p>';
+
+    let devs = [], loadErr = null;
+    try{
+      const { data, error } = await sb.from('registered_devices')
+        .select('*').eq('user_id', uid).order('last_used', {ascending:false});
+      if(error){
+        loadErr = error;
+        console.warn('[Finova] loadDevicesHtml error:', error);
+      } else {
+        devs = data || [];
+      }
+    }catch(e){
+      loadErr = e;
+      console.warn('[Finova] loadDevicesHtml exception:', e);
+    }
+
+    _devicesCache = devs;
+
+    if(loadErr){
+      const isTableMissing = loadErr.code === '42P01' || loadErr.message?.includes('does not exist');
+      el.innerHTML = isTableMissing
+        ? '<p style="font-size:.8rem;color:var(--amber)">⚠️ Table not set up yet. Run the <strong>registered_devices</strong> DDL from the schema section in Supabase SQL Editor.</p>'
+        : `<p style="font-size:.8rem;color:var(--red)">Error loading devices: ${esc(loadErr.message||'Unknown error')}</p>`;
+      return;
+    }
+
+    if(!devs.length){
+      el.innerHTML = '<p style="font-size:.8rem;color:var(--t2)">No registered devices found.</p>';
+      return;
+    }
+
+    el.innerHTML = devs.map(d=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem .8rem;border-radius:var(--r10);background:var(--gl);border:1.5px solid var(--bd);margin-bottom:.45rem;gap:.5rem">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.875rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+            ${esc(d.device_name||'Unknown Device')}
+            ${d.device_id===did ? '<span style="font-size:.68rem;background:rgba(74,222,128,.15);color:var(--green);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:.1rem .4rem">This device</span>' : ''}
+          </div>
+          <div style="font-size:.72rem;color:var(--t2);margin-top:.18rem">
+            Last used: ${d.last_used ? new Date(d.last_used).toLocaleString() : '—'}
+            &nbsp;·&nbsp; ${d.is_verified ? '✅ Verified' : '⏳ Pending verification'}
+          </div>
         </div>
-        ${d.device_id!==did ? `<button class="bdel" data-devid="${esc(d.device_id)}" data-devname="${esc(d.device_name||'device')}" onclick="removeDeviceClick(this)">Remove</button>` : ''}
+        ${d.device_id !== did
+          ? `<button class="bdel" style="flex-shrink:0" data-devid="${esc(d.device_id)}" data-devname="${esc(d.device_name||'device')}" onclick="removeDeviceClick(this)">Remove</button>`
+          : ''}
       </div>`).join('');
   }
 
@@ -5676,25 +5814,31 @@ function openAccountSettings(){
     if(!devId) return;
 
     const email = S.user?.email || 'your email';
-    const sent  = await sendRemovalOtp();
-    if(!sent){ toast('Could not send OTP — check your connection.','e'); return; }
 
-    const ok = await showOtpModal({
-      title:    '🗑 Remove Device',
-      subtitle: `Confirm removal of <strong>${esc(devName)}</strong>.<br>Enter the verification code sent to <strong>${email}</strong>.`,
-      onVerify: async(token)=>{
-        const { data, error } = await sb.auth.verifyOtp({
-          email: S.user.email, token, type:'email'
-        });
-        if(error) return false;
-        const {error:delErr} = await sb.from('registered_devices')
-          .delete().eq('user_id', S.user.id).eq('device_id', devId);
-        return !delErr;
-      },
-      onResend: sendRemovalOtp,
-    });
+    // Store the pending removal target so the magic link return can action it
+    const removalKey = 'fv_remove_device_' + S.user.id;
+    localStorage.setItem(removalKey, devId);
 
-    if(ok){
+    const sendRes = await sendDeviceMagicLink();
+    if(!sendRes.ok){
+      localStorage.removeItem(removalKey);
+      toast('Could not send link: ' + (sendRes.error||'Unknown error'), 'e');
+      return;
+    }
+
+    // Show wait screen — resolves when magic link is clicked
+    const verified = await showMagicLinkWaitScreen(email, sendDeviceMagicLink);
+    localStorage.removeItem(removalKey);
+
+    if(!verified){ return; } // user cancelled
+
+    // Actually delete the device
+    const { error: delErr } = await sb.from('registered_devices')
+      .delete().eq('user_id', S.user.id).eq('device_id', devId);
+
+    if(delErr){
+      toast('❌ Could not remove device: ' + delErr.message, 'e');
+    } else {
       toast(`✅ Device "${devName}" removed.`, 's');
       await loadDevicesHtml();
     }
@@ -5981,6 +6125,15 @@ Run in order. Safe to re-run — uses IF NOT EXISTS / OR REPLACE.
 -- ═══════════════════════════════════════════════════════════
 -- REGISTERED DEVICES TABLE — Device-Based Security Model
 -- Run in Supabase SQL Editor. Safe to re-run.
+-- ═══════════════════════════════════════════════════════════
+
+-- ═══════════════════════════════════════════════════════════
+-- IMPORTANT SETUP — Do this BEFORE running the table DDL:
+-- In Supabase Dashboard → Authentication → Providers → Email:
+--   1. Make sure "Enable Email provider" is ON
+--   2. Enable "Email OTP" (or "Magic Link") — this is what sends the code
+--   3. Set OTP expiry to 300 seconds (5 minutes) recommended
+--   4. Under Auth → Rate Limits, raise "OTP / Magic link" limit if testing
 -- ═══════════════════════════════════════════════════════════
 
 create table if not exists registered_devices (
