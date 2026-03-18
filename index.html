@@ -1838,15 +1838,9 @@ $('btn-signup').addEventListener('click', async()=>{
 async function doSignOut(){
   clearInterval(S.stockRefreshTimer);
   if(S.realtimeChannel&&sb) sb.removeChannel(S.realtimeChannel);
-  // Fire-and-forget device removal — never let it block or delay sign-out
-  try{
-    if(sb && S.user){
-      const did = getDeviceId();
-      sb.from('registered_devices').delete()
-        .eq('user_id', S.user.id).eq('device_id', did)
-        .then(()=>{}).catch(()=>{});  // fire-and-forget, errors ignored
-    }
-  }catch(_){}
+  // Device row is intentionally kept on sign-out.
+  // Rows persist until explicitly removed via Account Settings → Remove Device.
+  // Removing on logout would reset the count and let any device bypass the 3-device limit.
   clearVaultKey(); // wipe the encryption key from memory and localStorage
   if(sb) await sb.auth.signOut();
   S.user=null;
@@ -2460,6 +2454,9 @@ async function handleDeviceRegistration(){
 function showVaultOverlay(){
   const ov = $('vault-ov');
   if(!ov) return;
+  // Don't show vault overlay if device registration modal is already open
+  const otpOv = document.getElementById('otp-modal-ov');
+  if(otpOv && !otpOv.classList.contains('dn')) return;
 
   const uid = S.user?.id || '';
   const hasToken    = !!localStorage.getItem('fv_vtok_' + uid);     // PIN token exists
